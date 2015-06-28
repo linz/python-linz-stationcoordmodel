@@ -1,0 +1,9 @@
+*.pyc
+build
+dist
+linz_stationcoordmodel.egg-info
+python-linz-stationcoordmodel*
+debian/python-linz*
+debian/debhelper.log
+debian/substvars
+debian/files
