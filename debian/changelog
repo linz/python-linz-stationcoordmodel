@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.1.0-1) trusty; urgency=medium
+
+  * Updating CORS_timeseries to handle Sqlite data
+  * Adding option to select multiple solutions from sqlite db
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 30 Jun 2015 11:50:21 +1200
+
 python-linz-stationcoordmodel (1.0.0-1) trusty; urgency=medium
 
   * source package automatically created by stdeb 0.6.0+git
