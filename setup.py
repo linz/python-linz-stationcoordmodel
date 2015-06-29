@@ -81,6 +81,7 @@ setup(
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
     package_data={
+        'LINZ':['spm_editor.cfg'],
     },
 
     # Namespace package - other modules may include into these packages

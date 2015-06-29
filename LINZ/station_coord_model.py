@@ -6,7 +6,7 @@ from scipy.optimize import leastsq
 from scipy.special import erf
 from xml.dom import minidom
 from xml.etree import ElementTree
-from CORS_timeseries import CORS_timeseries
+from CORS_timeseries import Timeseries, FileTimeseries, robustStandardError
 import argparse
 from LINZ.geodetic.ellipsoid import grs80
 import math
@@ -1229,7 +1229,7 @@ class model( object ):
                         self.useobs[i]=False
                         break
 
-    def loadTimeSeries( self, filename, transform=None ):
+    def loadTimeSeries( self, timeseries, transform=None ):
         '''
         Loads a time series to be analysed with the model
 
@@ -1239,14 +1239,16 @@ class model( object ):
 
         Flags observations as excluded if they match the dates stored with the model.
         '''
-
-        if self.station and '{code}' in filename:
-            filename = filename.replace('{code}',self.station)
-
-        data=CORS_timeseries(filename,name=self.station,xyz0=self.xyz)
-        self.station=data.name()
-        self.xyz=data.xyz0()
-        self.dates,self.enu=data.getObs()
+        
+        if isinstance( timeseries, basestring ):
+            if self.station and '{code}' in filename:
+                filename = filename.replace('{code}',self.station)
+            timeseries=FileTimeseries(filename,code=self.station)
+        
+        timeseries.setXyzTransform(self.xyz)
+        self.dates,self.enu=timeseries.getObs()
+        self.station=timeseries.code()
+        self.xyz=timeseries.xyz0()
         self.setExcludedObs()
 
     def getObs( self ):
@@ -1347,7 +1349,7 @@ class model( object ):
         start_values = [p.fitValue() for p in fit_params]
         # Determine standard errors based on differences between obs
         # Used to weight observations in fit
-        se = np.array([CORS_timeseries.robustStandardError(self.enu)])
+        se = np.array([robustStandardError(self.enu)])
 
         # Form the working arrays of observation dates, ENU coordinates,
         # and usage flag

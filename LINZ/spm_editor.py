@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import station_coord_model as spm
-import CORS_timeseries as CORS_timeseries
+from CORS_timeseries import TimeseriesList, robustStandardError
 
 help_file='spm_editor_help.html'
 default_model_file='stations/{code}.xml'
@@ -327,7 +327,7 @@ class AppForm(QMainWindow):
                     parts=re.split(r'\s+',l.strip(),1)
                     if len(parts) != 2:
                         raise RuntimeError('Invalid configuration line: '+l)
-                    if parts[0] not in 'model_file model_backup_file timeseries_file update_availability'.split():
+                    if parts[0] not in 'model_file model_backup_file timeseries_file timeseries_type update_availability'.split():
                         raise RuntimeError('Invalid configuration item: '+parts[0])
                     config[parts[0]]=parts[1]
 
@@ -336,7 +336,6 @@ class AppForm(QMainWindow):
         self.config=config
         self.model_file=config.get('model_file',default_model_file)
         self.model_backup_file=config.get('model_backup_file',default_model_backup_file)
-        self.timeseries_file=config.get('timeseries_file',default_timeseries_file)
         self.update_availability=config.get('update_availability','False').lower()=='true'
         if '{code}' not in self.model_file:
             raise RuntimeError('Configuration item model_file must include "{code}"')
@@ -344,8 +343,12 @@ class AppForm(QMainWindow):
              '{code}' not in self.model_backup_file and 
              '{model_file}' not in self.model_backup_file ):
             raise RuntimeError('Configuration item model_backup_file must include "{model_file}" or "{code}"')
-        if '{code}' not in self.timeseries_file:
-            raise RuntimeError('Configuration item timeseries_file must include "{code}"')
+    
+        self.timeseries_file=config.get('timeseries_file',default_timeseries_file)
+        solutiontypes=config.get('timeseries_types','')
+        solutiontypes=[] if solutiontypes == '' else solutiontypes.split('+')
+        self.solutiontypes=solutiontypes
+        self.timeseries_list=TimeseriesList(self.timeseries_file)
 
     def savePlot(self):
         file_choices = "PNG file (*.png)"
@@ -476,7 +479,8 @@ class AppForm(QMainWindow):
         loadfile=os.path.exists(modelFile)
         self.model=spm.model(station=code,filename=modelFile,loadfile=loadfile)
         code=self.model.station
-        self.model.loadTimeSeries(timeseriesFile)
+        timeseries=self.timeseries_list.timeseries(code,self.solutiontypes)
+        self.model.loadTimeSeries(timeseries)
         if not loadfile:
             self.backedup.add(code)
         self.savestate(True)
@@ -521,7 +525,7 @@ class AppForm(QMainWindow):
             return
 
         self.obs_count=len(dates)
-        self.obs_rse=CORS_timeseries.CORS_timeseries.robustStandardError(obs)
+        self.obs_rse=robustStandardError(obs)
         residuals=[0,0,0]
         calc=None
         if self.model:
@@ -546,17 +550,8 @@ class AppForm(QMainWindow):
     def reloadCodeList(self):
         modelsonly = self.modelsonly.isChecked()
         self.codelist.clear()
-        timeseries_dir=os.path.dirname(self.timeseries_file)
-        # Create a regular expression for timeseries file names
-        tfre=os.path.basename(self.timeseries_file)
-        tfre=r'(?P<code>\w{4})'.join([re.escape(x) for x in tfre.split('{code}')])
-        tfre=re.compile(tfre)
 
-        for filename in sorted(os.listdir(timeseries_dir)):
-            m=tfre.match(filename)
-            if not m:
-                continue
-            code = m.group('code').upper()
+        for code in self.timeseries_list.codes():
             if modelsonly and not os.path.exists(self.modelFile(code)):
                 continue
             self.codelist.addItem(code)
@@ -941,6 +936,9 @@ class AppForm(QMainWindow):
 def main():
     cfgfile=os.path.splitext(__file__)[0]+'.cfg'
     usercfg='~/.'+os.path.basename(cfgfile)
+    if os.path.exists(usercfg):
+        cfgfile=usercfg
+    usercfg=os.path.basename(cfgfile)
     if os.path.exists(usercfg):
         cfgfile=usercfg
     parser=argparse.ArgumentParser(description='View and update GNSS time series models')
