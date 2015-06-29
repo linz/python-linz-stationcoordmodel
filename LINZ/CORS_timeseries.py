@@ -137,6 +137,28 @@ class SqliteTimeseries( Timeseries ):
         order by epoch
         '''
 
+    _sqlMultiType='''
+        select
+             m.epoch, m.code as code, m.solution_type, m.X as x, m.Y as y, m.Z as z 
+        from
+             mark_coordinate m,
+             (select
+                 epoch,
+                 min({case}) as version
+              from 
+                 mark_coordinate
+              where code=? and
+                    {case} < ?
+              group by
+                 epoch
+              ) as v
+        where 
+            m.code = ? and
+            m.epoch=v.epoch and
+            {case} = v.version
+        order by m.epoch
+        '''
+
     _sqlList='''
         select distinct code, solution_type
         from mark_coordinate
@@ -168,14 +190,30 @@ class SqliteTimeseries( Timeseries ):
 
     def _loadData( self ):
         db=SqliteTimeseries._openDb( self._dbfile )
-        data=pd.read_sql(SqliteTimeseries._sql,db,params=(self.code(),self._solutiontype),
-                               index_col='epoch')
+        solntype=self.solutiontype()
+        code=self.code()
+        if '+' not in solntype:
+            data=pd.read_sql(SqliteTimeseries._sql,db,params=(code,solntype),index_col='epoch')
+        else:
+            types=solntype.split('+')
+            casesql='CASE solution_type'
+            for i,t in enumerate(types):
+                casesql=casesql+' WHEN ? THEN '+str(i)
+            casesql=casesql+' ELSE '+str(len(types))+' END'
+            sql=SqliteTimeseries._sqlMultiType
+            sql=sql.replace('{case}',casesql)
+            params=[]
+            params.extend(types)
+            params.append(code)
+            params.extend(types)
+            params.append(len(types))
+            params.append(code)
+            params.extend(types)
+            data=pd.read_sql(sql,db,params=params,index_col='epoch')
         db.close()
         #, parse_dates=['epoch'])
         data.set_index(pd.to_datetime(data.index),inplace=True)
         return data
-
-
 
 class FileTimeseries( Timeseries ):
 
