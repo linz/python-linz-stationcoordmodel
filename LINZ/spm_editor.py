@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import StationCoordinateModel as spm
-from CORS_timeseries import TimeseriesList, robustStandardError
+from CORS_Timeseries import TimeseriesList, robustStandardError
 
 help_file='spm_editor_help.html'
 default_model_file='stations/{code}.xml'

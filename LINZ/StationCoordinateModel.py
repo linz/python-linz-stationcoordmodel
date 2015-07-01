@@ -6,7 +6,7 @@ from scipy.optimize import leastsq
 from scipy.special import erf
 from xml.dom import minidom
 from xml.etree import ElementTree
-from CORS_timeseries import Timeseries, FileTimeseries, robustStandardError
+from CORS_Timeseries import Timeseries, FileTimeseries, robustStandardError
 import argparse
 from LINZ.geodetic.ellipsoid import grs80
 import math
