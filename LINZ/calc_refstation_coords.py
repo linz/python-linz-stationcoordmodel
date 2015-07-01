@@ -33,11 +33,11 @@ def main():
 
     if args.def_dir:
         sys.path.append(defdir+'/tools/LINZ')
-    from DeformationModel import Model as DefModel
-    from LINZ.geodetic.ellipsoid import grs80
-    from LINZ.geodetic.ITRF_transformation import transformation
+    from LINZ.DeformationModel import Model as DefModel
+    from LINZ.Geodetic.Ellipsoid import GRS80
+    from LINZ.Geodetic.ITRF import Transformation
 
-    itrf_tfm=transformation(from_itrf='ITRF2008',to_itrf='ITRF96')
+    itrf_tfm=Transformation(from_itrf='ITRF2008',to_itrf='ITRF96')
     defmodel=DefModel.Model(mdldir)
 
     gdbcrds={}
@@ -100,7 +100,7 @@ def main():
                         c.setEnabled(False)
 
                 xyz08=m.calc(calcDate,enu=False)
-                llh08=grs80.geodetic(xyz08)
+                llh08=GRS80.geodetic(xyz08)
                 llh96=itrf_tfm.transformLonLat(llh08[0],llh08[1],llh08[2],calcDate)
                 if llh96[0] < 0:
                     llh96[0] += 360.0
@@ -120,7 +120,7 @@ def main():
                 if ucode in gdbcrds:
                     gcrds=gdbcrds[ucode] 
                     csv.write(',{0:.9f},{1:.9f},{2:.4f}'.format(*gcrds))
-                    dedln,dndlt=grs80.metres_per_degree(*gcrds)
+                    dedln,dndlt=GRS80.metres_per_degree(*gcrds)
                     edif=(gcrds[0]-llhnz2k[0])*dedln
                     ndif=(gcrds[1]-llhnz2k[1])*dndlt
                     hdif=gcrds[2]-llhnz2k[2]
