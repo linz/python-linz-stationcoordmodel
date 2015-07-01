@@ -16,7 +16,7 @@ import re
 import sys
 
 '''
-stn_pred_model: 
+StationCoordinateModel:
 
 A module for calculating functional representations of GNSS time series data, termed 
 station coordinate prediction models. Each model consists of a set of terms such as 
@@ -26,7 +26,7 @@ have been excluded from the model calculation.
 
 The module provides the following classes:
 
-class model:  
+class Model:  
     The main class encapsulating the station coordinate prediction model.
     This manages reading and saving the model as an XML file, read in time series data,
     fitting the model to the time series. 
@@ -842,7 +842,7 @@ class exclude_obs( object ):
         return exclude_obs( date, comment )
 
     
-class model( object ):
+class Model( object ):
     '''
     Class representing a station prediction model.  
 
@@ -1579,7 +1579,7 @@ class model( object ):
 def main():
     import argparse
 
-    parser=argparse.ArgumentParser('Calculate a time series from a station prediction model')
+    parser=argparse.ArgumentParser('Calculate a time series from a station coordinate model')
     parser.add_argument('code',help='Code of station to calculate or the name of a model file')
     parser.add_argument('start_date',nargs='?',help='Start date for calculating (YYYY-MM-DD) or filename')
     parser.add_argument('end_date',nargs='?',help='End date for calculating (YYYY-MM-DD)')
@@ -1605,7 +1605,7 @@ def main():
         code=None
 
     try:
-        spm=model(station=code,filename=model_file)
+        spm=Model(station=code,filename=model_file)
 
         savemodel=args.update_availability or args.clear_availability
         checkfunc=True if args.clear_availability else None

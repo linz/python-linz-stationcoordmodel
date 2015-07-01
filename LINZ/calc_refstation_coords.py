@@ -4,7 +4,7 @@ import os.path
 import re
 import argparse
 from datetime import datetime,date
-from LINZ.stn_coord_model.stn_coord_model import model as spm
+from LINZ.StationCoordinateModel import Model as spm
 
 def main():
     calcDate=datetime(date.today().year,1,1)

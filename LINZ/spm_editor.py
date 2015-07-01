@@ -25,7 +25,7 @@ import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
 import numpy as np
 
-import station_coord_model as spm
+import StationCoordinateModel as spm
 from CORS_timeseries import TimeseriesList, robustStandardError
 
 help_file='spm_editor_help.html'
@@ -477,7 +477,7 @@ class AppForm(QMainWindow):
 
     def loadModel(self,modelFile,timeseriesFile,code=None):
         loadfile=os.path.exists(modelFile)
-        self.model=spm.model(station=code,filename=modelFile,loadfile=loadfile)
+        self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
         code=self.model.station
         timeseries=self.timeseries_list.timeseries(code,self.solutiontypes)
         self.model.loadTimeSeries(timeseries)

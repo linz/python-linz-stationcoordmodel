@@ -113,7 +113,7 @@ class Timeseries( object ):
         cols=('e','n','u') if enu else ('x','y','z')
         return data.index.to_pydatetime(),np.vstack((data[x] for x in cols)).T
 
-    def getData( self, enu=True, index=None ):
+    def getData( self, enu=True, index=None, normalize=False ):
         ''' 
         Returns the time series as a pandas DataFrame. 
 
@@ -125,7 +125,10 @@ class Timeseries( object ):
         data=self._data
         if index:
             data=data[index]
-        return data[['e','n','u']] if enu else data[['x','y','z']]
+        result=data[['e','n','u']] if enu else data[['x','y','z']]
+        if normalize:
+            result.set_index(result.index.normalize(),inplace=True)
+        return result
 
 
 class SqliteTimeseries( Timeseries ):
