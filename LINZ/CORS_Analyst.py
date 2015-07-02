@@ -15,8 +15,6 @@ from LINZ.DeformationModel.ITRF_NZGD2000 import Transformation as ITRF_Transform
 from LINZ.StationCoordinateModel import Model as StationCoordinateModel
 # from StationCoordinateModel import Model as StationCoordinateModel
 
-
-
 StationData=namedtuple('StationData','code timeseries stationCoordModel scmTimeseries gdbTimeseries')
 StationOffsetStats=namedtuple('StationOffsetStats','date gdbOffset scmOffset')
 
@@ -31,6 +29,10 @@ class CORS_Analyst( object ):
         self._writecsv=write_plot_files
         self._configfile=configfile or CORS_Analyst.configfile
         self._configgroup=configgroup or CORS_Analyst.configgroup
+
+        if not os.path.exists(self._configfile):
+            sys.stderr.write("Cannot find configuration file {0}\n".format(self._configfile))
+            sys.exit()
 
         if self._verbose:
             print "Reading configuration from",self._configfile
@@ -160,7 +162,7 @@ class CORS_Analyst( object ):
         addPoints(0,len(usepoint)-1,usepoint)
         return tsdata[usepoint]
 
-    def compileOffsetStats( self, stats, teststat, levels, testtype ):
+    def compileOffsetStats( self, code, stats, teststat, levels, testtype ):
         results={}
         for m in 'count mean std median min max'.split():
             mloc='50%' if m == 'median' else m
@@ -171,10 +173,23 @@ class CORS_Analyst( object ):
         testh=np.hypot(teststats[0],teststats[1])
         testv=abs(teststats[2])
         status='warn' if testh > levels[0] or testv > levels[1] else 'good'
-        if self._verbose and status == 'warn':
-            print "  {0} coordinates are significantly offset ({1:.4f} {2:.4f} m)".format(
-                testtype,testh,testv)
+        message=None
+        if status=='warn':
+            message=''
+            if testh > levels[0]:
+                message=(message+
+                         "{0} {1} {2} horizontal offset {3:.4f} m exceeds tolerance {4:.4f} m\n"
+                         .format(code,testtype,teststat,testh,levels[0]))
+            if testv > levels[1]:
+                message=(message+
+                         "{0} {1} {2} vertical offset {3:.4f} m exceeds tolerance {4:.4f} m \n"
+                         .format(code,testtype,teststat,testv,levels[1]))
+            if self._verbose:
+                print "  {0} coordinates are significantly offset ({1:.4f} {2:.4f} m)".format(
+                    testtype,testh,testv)
+
         results['status']=status
+        results['status_message']=message
         return results
 
     def compileStationData( self, code ):
@@ -185,8 +200,8 @@ class CORS_Analyst( object ):
         stnresults={
             "code": code,
             "offset_test_date": offsets.date.strftime("%Y-%m-%d"),
-            "gdb_offset": self.compileOffsetStats(offsets.gdbOffset,self._teststat,self._gdbwarning,'GDB coordinate'),
-            "scm_offset": self.compileOffsetStats(offsets.scmOffset,self._teststat,self._scmwarning,'station coordinate model'),
+            "gdb_offset": self.compileOffsetStats(code,offsets.gdbOffset,self._teststat,self._gdbwarning,'GDB coordinate'),
+            "scm_offset": self.compileOffsetStats(code,offsets.scmOffset,self._teststat,self._scmwarning,'station coordinate model'),
             "scm_version": stndata.stationCoordModel.versiondate.strftime("%Y-%m-%d %H:%M:%S"),
             }
         

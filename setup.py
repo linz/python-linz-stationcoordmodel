@@ -68,7 +68,12 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['linz-geodetic','numpy','scipy','matplotlib','pandas'],
+
+    # Note: matplotlib dependency not included as causes probrams not to run,
+    # forces dependency on tornado (python web server)
+
+    #install_requires=['linz-geodetic','numpy','scipy','matplotlib','pandas'],
+    install_requires=['linz-geodetic','numpy','scipy','pandas'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
