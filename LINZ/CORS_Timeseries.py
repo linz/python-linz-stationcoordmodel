@@ -8,7 +8,7 @@ import numpy as np
 import datetime as dt
 import pandas as pd
 
-from LINZ.geodetic.ellipsoid import grs80
+from LINZ.Geodetic.Ellipsoid import GRS80
 
 def robustStandardError(obs):
     '''
@@ -31,13 +31,38 @@ def robustStandardError(obs):
 class Timeseries( object ):
 
         
-    def __init__( self, code, solutiontype='default', xyz0=None, transform=None ):
+    def __init__( self, code, solutiontype='default', 
+                 data=None, 
+                 dates=None, xyz=None,
+                 xyz0=None, transform=None ):
+        '''
+        Create a time series. Parameters are:
+
+        code            the station code being loaded
+        solutiontype    a string identifying the solution type of the time series
+        data            a pandas data frame with columns indexed on date and with
+                        columns x, y, z
+        dates, xyz      Alternative format for loading, dates is an array of dates,
+                        xyz is a numpy array with shape (n,3)
+        xyz0            Reference xyz coordinate for calculated enu components
+        transform      A
+        '''
 
         self._loaded=False
         self._code=code
         self._solutiontype=solutiontype
         self._xyz0=xyz0
         self._transform=transform
+        if xyz is not None and dates is not None:
+            data=pd.DataFrame(xyz,columns=('x','y','z'))
+            data.set_index(pd.to_datetime(dates),inplace=True)
+        self._sourcedata=data
+
+    def _loadData( self ):
+        '''
+        Abstract class, overridden in base classes
+        '''
+        return self._sourcedata.copy()
 
     def _load( self ):
 
@@ -46,8 +71,12 @@ class Timeseries( object ):
 
         # Call provider specific data load
         # Should return a dataframe with x,y,z indexed on the date/time of the each point
+
         data=self._loadData()
+        if data is None:
+            raise RuntimeError('No data provided for time series')
         
+        data.sort_index(inplace=True)
         xyz=np.vstack((data.x,data.y,data.z)).T
         if self._transform:
             xyz=[self._transform(x) for x in xyz]
@@ -57,8 +86,8 @@ class Timeseries( object ):
 
         xyz0=self._xyz0
         xyz0=np.array(xyz0) if xyz0 is not None else xyz[0]
-        lon,lat=grs80.geodetic(xyz0)[:2]
-        enu_axes=grs80.enu_axes(lon,lat)
+        lon,lat=GRS80.geodetic(xyz0)[:2]
+        enu_axes=GRS80.enu_axes(lon,lat)
 
         diff=xyz-xyz0
         enu=(xyz-xyz0).dot(enu_axes.T)
@@ -74,7 +103,9 @@ class Timeseries( object ):
         self.robustStandardError=lambda: Timeseries.robustStandardError(self.getObs()[1])
 
     def setXyzTransform( self, xyz0=None, transform=None ):
-        if xyz0 is not None and xyz0 != self._xyz0:
+        if xyz0 is not None and (
+            self._xyz0 is None or
+            (self._xyz0 != xyz0).any()):
             self._xyz0=xyz0
             self._loaded=False
         if transform != self._transform:
@@ -129,6 +160,13 @@ class Timeseries( object ):
         if normalize:
             result.set_index(result.index.normalize(),inplace=True)
         return result
+
+    def dates( self ):
+        '''
+        Returns the dates of the time series
+        '''
+        self._load()
+        return self._data.index
 
 
 class SqliteTimeseries( Timeseries ):
@@ -300,7 +338,6 @@ class FileTimeseries( Timeseries ):
         code=code if code else data.code.iloc[0]
         self.setName(code)
         data=data[data.code==code]
-        data=data.sort_index()
         return data
 
 

@@ -8,7 +8,7 @@ from xml.dom import minidom
 from xml.etree import ElementTree
 from CORS_Timeseries import Timeseries, FileTimeseries, robustStandardError
 import argparse
-from LINZ.geodetic.ellipsoid import grs80
+from LINZ.Geodetic.Ellipsoid import GRS80
 import math
 import numpy as np
 import os.path
@@ -902,8 +902,8 @@ class Model( object ):
         self.site=site or station
         self.priority=int(priority)
         if xyz is not None:
-            lon,lat,h=grs80.geodetic(xyz)
-            self.enu_axes=grs80.enu_axes(lon,lat)
+            lon,lat,h=GRS80.geodetic(xyz)
+            self.enu_axes=GRS80.enu_axes(lon,lat)
 
     def copy( self, filename=None ):
         '''
