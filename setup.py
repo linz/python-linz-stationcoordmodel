@@ -81,7 +81,7 @@ setup(
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
     package_data={
-        'LINZ':['spm_editor.cfg'],
+        'LINZ':['spm_editor.cfg','CORS_Analyst.cfg'],
     },
 
     # Namespace package - other modules may include into these packages
@@ -95,6 +95,7 @@ setup(
             'calc_refstation_coords=LINZ.calc_refstation_coords:main',
             'station_coord_model=LINZ.station_coord_model:main',
             'spm_editor=LINZ.spm_editor:main',
+            'analyse_cors=LINZ.CORS_Analyst:main',
         ],
     },
 )
