@@ -206,31 +206,38 @@ class CORS_Analyst( object ):
             }
         
         if self._writecsv:
-            ts=stndata.timeseries
-            tsdata=ts.getData()
-            tsdata.set_index(tsdata.index.normalize(),inplace=True)
+            # Write the CSV file options
 
-            # Generate data for plotting gdb coord and stn pred model
-
+            fillmodel=self._cfg.get(self._configgroup,'fill_model_timeseries').lower() == 'yes'
             trimmodel=self._cfg.get(self._configgroup,'trim_model_timeseries').lower() == 'yes'
             combinets=self._cfg.get(self._configgroup,'combine_timeseries').lower() == 'yes'
+            precision=self._cfg.getfloat(self._configgroup,'trim_model_precision')
+
+            # Generate data for plotting gdb coord and stn pred model
+            # Get the observed timeseries 
+            ts=stndata.timeseries
+            tsdata=ts.getData()
             
-            if trimmodel:
+            # Fill the model 
+            if fillmodel:
+                # If filling the model, normalize to whole dates 
+                tsdata.set_index(tsdata.index.normalize(),inplace=True)
                 plotmargin=self._cfg.getint(self._configgroup, 'plot_margin')
                 startdate=tsdata.index[0]-DateOffset(days=plotmargin)
                 enddate=tsdata.index[-1]+DateOffset(days=plotmargin)
                 dates=pd.date_range(startdate,enddate,freq='d')
                 xyz0=ts.xyz0()
-                precision=self._cfg.getfloat(self._configgroup,'trim_model_precision')
-
-                gdbmodel=self.gdbTimeseries(code,dates,xyz0)
-                gdbmodel=self.trimmedModelTimeseries(gdbmodel.getData(),precision)
-
-                scmmodel=self.scmTimeseries(stndata.stationCoordModel,dates)
-                scmmodel=self.trimmedModelTimeseries(scmmodel.getData(),precision)
+                gdbmodel=self.gdbTimeseries(code,dates,xyz0).getData()
+                scmmodel=self.scmTimeseries(stndata.stationCoordModel,dates).getData()
             else:
                 gdbmodel=stndata.gdbTimeseries.getData()
                 scmmodel=stndata.scmTimeseries.getData()
+
+            # Calculate the time series
+
+            if trimmodel:
+                gdbmodel=self.trimmedModelTimeseries(gdbmodel,precision)
+                scmmodel=self.trimmedModelTimeseries(scmmodel,precision)
 
             if combinets:
                 gdbmodel.columns=('gdb_e','gdb_n','gdb_u')
@@ -257,6 +264,8 @@ class CORS_Analyst( object ):
         for c in sorted(codelist):
             try:
                 coderesults.append(self.compileStationData(c))
+            except KeyboardInterrupt:
+                break
             except:
                 print "Station "+c+": "+str(sys.exc_info()[1])
         results['station_summary']=coderesults
