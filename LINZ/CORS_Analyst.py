@@ -208,11 +208,13 @@ class CORS_Analyst( object ):
         if self._writecsv:
             ts=stndata.timeseries
             tsdata=ts.getData()
-            self.writeTimeseriesCSV( code, tsdata, 'timeseries_csv' )
+            tsdata.set_index(tsdata.index.normalize(),inplace=True)
 
             # Generate data for plotting gdb coord and stn pred model
 
             trimmodel=self._cfg.get(self._configgroup,'trim_model_timeseries').lower() == 'yes'
+            combinets=self._cfg.get(self._configgroup,'combine_timeseries').lower() == 'yes'
+            
             if trimmodel:
                 plotmargin=self._cfg.getint(self._configgroup, 'plot_margin')
                 startdate=tsdata.index[0]-DateOffset(days=plotmargin)
@@ -230,8 +232,16 @@ class CORS_Analyst( object ):
                 gdbmodel=stndata.gdbTimeseries.getData()
                 scmmodel=stndata.scmTimeseries.getData()
 
-            self.writeTimeseriesCSV(code,gdbmodel,'gdb_timeseries_csv')
-            self.writeTimeseriesCSV(code,scmmodel,'scm_timeseries_csv')
+            if combinets:
+                gdbmodel.columns=('gdb_e','gdb_n','gdb_u')
+                scmmodel.columns=('scm_e','scm_n','scm_u')
+                tsdata=tsdata.join(gdbmodel,how='outer')
+                tsdata=tsdata.join(scmmodel,how='outer')
+                self.writeTimeseriesCSV( code, tsdata, 'timeseries_csv' )
+            else:
+                self.writeTimeseriesCSV( code, tsdata, 'timeseries_csv' )
+                self.writeTimeseriesCSV(code,gdbmodel,'gdb_timeseries_csv')
+                self.writeTimeseriesCSV(code,scmmodel,'scm_timeseries_csv')
 
         return stnresults
 
