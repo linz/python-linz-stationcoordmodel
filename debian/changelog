@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.6.0-1) trusty; urgency=medium
+
+  * Adding option for combining plots to support dygraph plots
+  * More fixes to CORS_Analyst
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 07 Jul 2015 18:29:56 +1200
+
 python-linz-stationcoordmodel (1.5.0-1) trusty; urgency=medium
 
   * Fixing up error messages etc
