@@ -259,6 +259,8 @@ class CORS_Analyst( object ):
         results={
             "calcdate": datetime.now().strftime("%Y-%m-%d: %H:%M:%S"),
             "deformation_model_version": self.deformationModelVersion,
+            "number_of_days_tested": self._offsetdays,
+            "test_statistic": self._teststat,
             }
         coderesults=[]
         for c in sorted(codelist):
@@ -276,12 +278,12 @@ def main():
     import argparse
     parser=argparse.ArgumentParser(description="Analyse PositioNZ CORS data to monitor datum integrity. "+
                                   "Results of analysis are written to files specified in the configuration file",
-                                   usage="%(prog)s [options] code code ...")
+                                   usage="%(prog)s [options] config_file code code ...")
+    parser.add_argument('config_file',help="Name of the configuration file")
     parser.add_argument('code',nargs='*',help="Specific station codes to analyse.  Default is as defined in the configuration file")
-    parser.add_argument('-c','--config-file',help="Name of the configuration file")
     parser.add_argument('-v','--verbose',action='store_true',help="Verbose output")
     parser.add_argument('-p','--plot-files',action='store_true',help="Generate CSV files for plotting")
-    parser.add_argument('-d','--dump-config-file',action='store_true',help="Print a sample configuration file")
+    parser.add_argument('-c','--dump-config-file',action='store_true',help="Print a sample configuration file")
     args=parser.parse_args()
 
     if args.dump_config_file:
