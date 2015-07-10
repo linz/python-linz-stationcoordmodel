@@ -163,12 +163,19 @@ def saveNotificationStatus( notifiedFile, notified ):
 
 def main():
     parser=argparse.ArgumentParser('Report on CORS datum integrity status')
-    parser.add_argument('config_file',help="Configuration file for script")
+    parser.add_argument('config_file',nargs='?',help="Configuration file for script")
     parser.add_argument('-s','--config-section',default='daily_report',help="Configuration section to use")
-    parser.add_argument('-c','--dump-config-file',help="Print an example configuration file")
+    parser.add_argument('-c','--dump-config-file',action='store_true',help="Print an example configuration file")
     args=parser.parse_args()
 
+    if args.dump_config_file:
+        cfgfile=os.path.splitext(__file__)[0]+'.cfg'
+        with open(cfgfile) as cfgf:
+            print cfgf.read()
+            sys.exit()
+
     config=get_configuration(args.config_file,args.config_section)
+
 
     datumStatus=loadDatumStatus(config('cors_datum_status_file'))
     warnings=getWarnings(datumStatus)
