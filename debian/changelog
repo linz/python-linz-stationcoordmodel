@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.7.1-1) trusty; urgency=medium
+
+  * Adding missing dump_config function
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 10 Jul 2015 12:34:58 +1200
+
 python-linz-stationcoordmodel (1.7.0-1) trusty; urgency=medium
 
   * Adding report_datum_status
