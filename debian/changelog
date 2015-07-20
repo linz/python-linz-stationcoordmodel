@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.8.0-1) trusty; urgency=medium
+
+  * removing garbage!
+  * Adding plotting and comparison function to time series
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 20 Jul 2015 13:17:11 +1200
+
 python-linz-stationcoordmodel (1.7.1-1) trusty; urgency=medium
 
   * Adding missing dump_config function
