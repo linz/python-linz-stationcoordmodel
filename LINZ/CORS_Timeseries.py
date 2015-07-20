@@ -34,7 +34,9 @@ class Timeseries( object ):
     def __init__( self, code, solutiontype='default', 
                  data=None, 
                  dates=None, xyz=None,
-                 xyz0=None, transform=None ):
+                 xyz0=None, 
+                 xyzenu=None,
+                 transform=None ):
         '''
         Create a time series. Parameters are:
 
@@ -45,6 +47,7 @@ class Timeseries( object ):
         dates, xyz      Alternative format for loading, dates is an array of dates,
                         xyz is a numpy array with shape (n,3)
         xyz0            Reference xyz coordinate for calculated enu components
+        xyzenu          Reference xyz coordinate for calculated enu components
         transform      A
         '''
 
@@ -52,6 +55,7 @@ class Timeseries( object ):
         self._code=code
         self._solutiontype=solutiontype
         self._xyz0=xyz0
+        self._xyzenu=xyzenu
         self._transform=transform
         if xyz is not None and dates is not None:
             data=pd.DataFrame(xyz,columns=('x','y','z'))
@@ -86,7 +90,9 @@ class Timeseries( object ):
 
         xyz0=self._xyz0
         xyz0=np.array(xyz0) if xyz0 is not None else xyz[0]
-        lon,lat=GRS80.geodetic(xyz0)[:2]
+        xyzenu=self._xyzenu
+        xyzenu=np.array(xyzenu) if xyzenu is not None else xyz0
+        lon,lat=GRS80.geodetic(xyzenu)[:2]
         enu_axes=GRS80.enu_axes(lon,lat)
 
         diff=xyz-xyz0
@@ -102,11 +108,16 @@ class Timeseries( object ):
 
         self.robustStandardError=lambda: Timeseries.robustStandardError(self.getObs()[1])
 
-    def setXyzTransform( self, xyz0=None, transform=None ):
+    def setXyzTransform( self, xyz0=None, xyzenu=None, transform=None ):
         if xyz0 is not None and (
             self._xyz0 is None or
             (self._xyz0 != xyz0).any()):
             self._xyz0=xyz0
+            self._loaded=False
+        if xyzenu is not None and (
+            self._xyzenu is None or
+            (self._xyzenu != xyzenu).any()):
+            self._xyzenu=xyzenu
             self._loaded=False
         if transform != self._transform:
             self._transform=transform
@@ -114,6 +125,9 @@ class Timeseries( object ):
 
     def xyz0( self ):
         return self._xyz0
+
+    def xyzenu( self ):
+        return self._xyzenu
 
     def code( self ):
         return self._code
@@ -168,6 +182,64 @@ class Timeseries( object ):
         self._load()
         return self._data.index
 
+    def plot( self, detrend=False, samescale=False, **kwds ):
+        '''
+        Plot the time series onto 3 separate graphs
+
+           detrend=True to remove the trend from the plots
+           samescale=True to force the X,Y,Z axes to share the same scale
+           
+           Additional keywords are passed to the pyplot.subplots function
+           call.
+        '''
+        self._load()
+
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+
+        title="{0} {1} timeseries".format(self._code,self._solutiontype)
+        if detrend:
+            title=title+' detrended'
+
+        settings={'sharex':True,'sharey':samescale,'figsize':(8,6),'dpi':100}
+        settings.update(kwds)
+        fig, plots=plt.subplots(3,1,**settings)
+        fig.suptitle(title)
+        data=self._data
+        
+        axis_labels=('East','North','Up')
+        for i,axis in enumerate(('e','n','u')):
+            series=data[axis]
+            if detrend:
+                days=mdates.date2num(data.index)
+                trendp=np.poly1d(np.polyfit(days,series,1))
+                trend=trendp(days)
+                series=(series-trend)*1000
+            plots[i].plot(data.index,series,'b+',label='Time series',picker=5)
+            plots[i].set_ylabel(axis_labels[i])
+            plots[i].tick_params(labelsize=8)
+            plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
+
+    def compare( self, other, newcode=None, newtype=None ):
+        '''
+        Returns a time series comparing two others
+
+        By default requires that both series have the same code.  Will
+        return an error if not.  Over-ride by including a newcode parameter
+        '''
+        if newcode is None:
+            if self._code != other._code:
+                raise RuntimeError('Cannot compare two series with different codes')
+            newcode=self._code
+        if newtype is None:
+            newtype=other._solutiontype+'-'+self._solutiontype
+        d1=self.getData(enu=False)
+        d2=other.getData(enu=False)
+        join=d1.join(d2,rsuffix='2',how='inner')
+        data=pd.DataFrame(data={'x':join.x2-join.x,'y':join.y2-join.y,'z':join.z2-join.z})
+        xyz0=[0,0,0]
+        xyzenu=self._xyzenu if self._xyzenu is not None else self._xyz0
+        return Timeseries(newcode,newtype,data=data,xyz0=xyz0,xyzenu=xyzenu)
 
 class SqliteTimeseries( Timeseries ):
 
