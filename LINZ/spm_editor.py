@@ -293,7 +293,7 @@ class AppForm(QMainWindow):
 
     editableTypes=(spm.equipment_offset,spm.tectonic_offset,spm.slow_slip,spm.slow_slip_ramp,spm.exponential_decay,spm.velocity_change)
 
-    def __init__(self, cfgfile=None, options=None, spmfile=None, tsfile=None, parent=None):
+    def __init__(self, cfgfile=None, options=None, parent=None):
         QMainWindow.__init__(self, parent=None)
         self.read_config(cfgfile,options)
         self.backedup=set()
@@ -318,7 +318,7 @@ class AppForm(QMainWindow):
             self.reloadCodeList()
 
     def read_config(self,cfgfile,options=None):
-        config={}
+        config={x:None for x in 'model_file model_backup_file timeseries_file timeseries_type update_availability'.split()}
         if cfgfile and os.path.exists(cfgfile):
             with open(cfgfile) as cfg:
                 for l in cfg:
@@ -326,13 +326,14 @@ class AppForm(QMainWindow):
                         continue
                     parts=re.split(r'\s+',l.strip(),1)
                     if len(parts) != 2:
-                        raise RuntimeError('Invalid configuration line: '+l)
-                    if parts[0] not in 'model_file model_backup_file timeseries_file timeseries_type update_availability'.split():
+                        parts.append(None)
+                    if parts[0] not in config:
                         raise RuntimeError('Invalid configuration item: '+parts[0])
                     config[parts[0]]=parts[1]
 
         if options:
             config.update(options)
+        config={k:v for k,v in config.iteritems() if v is not None}
         self.config=config
         self.model_file=config.get('model_file',default_model_file)
         self.model_backup_file=config.get('model_backup_file',default_model_backup_file)
@@ -345,7 +346,7 @@ class AppForm(QMainWindow):
             raise RuntimeError('Configuration item model_backup_file must include "{model_file}" or "{code}"')
     
         self.timeseries_file=config.get('timeseries_file',default_timeseries_file)
-        solutiontypes=config.get('timeseries_types','')
+        solutiontypes=config.get('timeseries_type','')
         solutiontypes=[] if solutiontypes == '' else solutiontypes.split('+')
         self.solutiontypes=solutiontypes
         self.timeseries_list=TimeseriesList(self.timeseries_file)
@@ -942,27 +943,30 @@ def main():
     if os.path.exists(usercfg):
         cfgfile=usercfg
     parser=argparse.ArgumentParser(description='View and update GNSS time series models')
-    parser.add_argument('model_file',nargs='?',help='Station prediction model XML file')
-    parser.add_argument('timeseries_file',nargs='?',help='XYZ time series to use with the model')
-    parser.add_argument('-c','--config_file',default=cfgfile,help='Configuration file for the job')
-    parser.add_argument('-m','--default_model_file',help='Default file name for the model file - must include {code}')
-    parser.add_argument('-t','--default_timeseries_file',help='Default file name for the model file - must include {code}')
+    parser.add_argument('config_file',nargs='?',help='Station prediction model XML file')
+    parser.add_argument('-c','--example-config_file',action='store_true',help='Print an example configuration file')
+    parser.add_argument('-m','--model_file',help='Default file name for the model file - can include {code}')
+    parser.add_argument('-t','--timeseries_file',help='Timeseries file name (append :type for solution type)')
 
     args=parser.parse_args()
 
     options={}
-    if args.default_model_file:
-        options['model_file']=args.default_model_file
-    if args.default_timeseries_file:
-        options['timeseries_file']=args.default_timeseries_file
-
-    model=None
-    if args.model_file and not os.path.exists( args.model_file):
-        print "SPM model file "+args.model_file+" does not exist"
+    if args.example_config_file:
+        examplefile=os.path.splitext(__file__)[0]+'.cfg'
+        with open(examplefile) as f:
+            print f.read()
         sys.exit()
 
+    if args.model_file:
+        options['model_file']=args.default_model_file
+    if args.timeseries_file:
+        parts=args.timeseries_file.split(':')
+        options['timeseries_file']=parts[0]
+        if len(parts) > 1:
+            options['timeseries_type']=parts[1]
+
     app = QApplication(sys.argv)
-    form = AppForm(cfgfile=cfgfile,options=options,spmfile=args.model_file,tsfile=args.timeseries_file)
+    form = AppForm(cfgfile=cfgfile,options=options)
     form.show()
     app.exec_()
 
