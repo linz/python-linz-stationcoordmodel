@@ -36,7 +36,8 @@ class Timeseries( object ):
                  dates=None, xyz=None,
                  xyz0=None, 
                  xyzenu=None,
-                 transform=None ):
+                 transform=None,
+                 after=None):
         '''
         Create a time series. Parameters are:
 
@@ -48,7 +49,8 @@ class Timeseries( object ):
                         xyz is a numpy array with shape (n,3)
         xyz0            Reference xyz coordinate for calculated enu components
         xyzenu          Reference xyz coordinate for calculated enu components
-        transform      A
+        transform       A transformation function applied to the XYZ coordinates 
+        after           The earliest date for data of interest
         '''
 
         self._loaded=False
@@ -57,6 +59,7 @@ class Timeseries( object ):
         self._xyz0=xyz0
         self._xyzenu=xyzenu
         self._transform=transform
+        self._after=after
         if xyz is not None and dates is not None:
             data=pd.DataFrame(xyz,columns=('x','y','z'))
             data.set_index(pd.to_datetime(dates),inplace=True)
@@ -80,6 +83,9 @@ class Timeseries( object ):
         if data is None:
             raise RuntimeError('No data provided for time series')
         
+        if self._after is not None:
+            data=data[data.index > self._after]
+
         data.sort_index(inplace=True)
         xyz=np.vstack((data.x,data.y,data.z)).T
         if self._transform:
@@ -207,16 +213,18 @@ class Timeseries( object ):
         fig.suptitle(title)
         data=self._data
         
-        axis_labels=('East','North','Up')
+        axis_labels=('East)','North','Up')
         for i,axis in enumerate(('e','n','u')):
             series=data[axis]
+            ylabel=axis_labels[i]
             if detrend:
                 days=mdates.date2num(data.index)
                 trendp=np.poly1d(np.polyfit(days,series,1))
                 trend=trendp(days)
                 series=(series-trend)*1000
+                ylabel=ylabel+' mm'
             plots[i].plot(data.index,series,'b+',label='Time series',picker=5)
-            plots[i].set_ylabel(axis_labels[i])
+            plots[i].set_ylabel(ylabel)
             plots[i].tick_params(labelsize=8)
             plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
 
@@ -286,7 +294,7 @@ class SqliteTimeseries( Timeseries ):
         return db
 
     @staticmethod
-    def seriesList( dbfile, solutiontype=None ):
+    def seriesList( dbfile, solutiontype=None,after=None ):
         db=SqliteTimeseries._openDb( dbfile )
         seriescodes=pd.read_sql(SqliteTimeseries._sqlList, db )
         db.close()
@@ -294,11 +302,11 @@ class SqliteTimeseries( Timeseries ):
         for i in seriescodes.index:
             code,solntype=(seriescodes.code[i],seriescodes.solution_type[i])
             if solutiontype is None or solutiontype == solntype:
-                series.append(SqliteTimeseries(dbfile,code,solntype))
+                series.append(SqliteTimeseries(dbfile,code,solntype,after=after))
         return series
 
-    def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None ):
-        Timeseries.__init__( self, code, solutiontype, xyz0, transform )
+    def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None ):
+        Timeseries.__init__( self, code, solutiontype=solutiontype, xyz0=xyz0, transform=transform, after=after )
         self._dbfile=dbfile
 
     def _loadData( self ):
@@ -353,7 +361,7 @@ class FileTimeseries( Timeseries ):
     _epoch_col='epoch'
 
     @staticmethod
-    def seriesList( filepattern, solutiontype='default' ):
+    def seriesList( filepattern, solutiontype='default',after=None ):
         '''
         Get the potential time series files, any file matching the filepattern.  The 
         pattern can include {code} in the filename to represent the code to use
@@ -372,12 +380,12 @@ class FileTimeseries( Timeseries ):
             if path:
                 fn=os.path.join(path,fn)
             code=match.group('code')
-            series.append(FileTimeseries(fn,code,solutiontype))
+            series.append(FileTimeseries(fn,code,solutiontype,after=after))
         return series
 
 
-    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None ):
-        Timeseries.__init__(self,code,solutiontype,xyz0,transform)
+    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None, after=None ):
+        Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after)
         self._filename=filename
 
     def _loadData( self ):
@@ -418,13 +426,13 @@ class FileTimeseries( Timeseries ):
 
 class TimeseriesList( list ):
 
-    def __init__( self, source=None, solutiontype=None ):
+    def __init__( self, source=None, solutiontype=None, after=None ):
         list.__init__(self)
         if source is not None:
             if os.path.isfile(source):
-                self.extend(SqliteTimeseries.seriesList(source, solutiontype ))
+                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after ))
             else:
-                self.extend(FileTimeseries.seriesList(source,solutiontype))
+                self.extend(FileTimeseries.seriesList(source,solutiontype, after))
 
     def codes( self ):
         codes={}
