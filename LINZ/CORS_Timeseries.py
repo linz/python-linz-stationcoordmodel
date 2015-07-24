@@ -144,7 +144,18 @@ class Timeseries( object ):
     def setName( self, code ):
         self._code = code
 
-    def getObs( self, enu=True, index=None ):
+    def trend( self, columns='e n u'.split() ):
+        import matplotlib.dates as mdates
+        self._load()
+        columns=[columns] if isinstance(columns,basestring) else list(columns)
+        series=self._data[columns]
+        trends=[]
+        days=mdates.date2num(self._data.index)
+        pfit=np.polyfit(days,series,1)
+        trends=[np.poly1d(pfit[:,i])(days) for i,c in enumerate(columns)]
+        return pd.DataFrame(np.vstack(trends).T,index=self._data.index,columns=columns)
+
+    def getObs( self, enu=True, detrend=True, index=None ):
         '''
         Returns the time series as time and date arrays
 
