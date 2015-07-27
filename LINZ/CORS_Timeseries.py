@@ -37,7 +37,9 @@ class Timeseries( object ):
                  xyz0=None, 
                  xyzenu=None,
                  transform=None,
-                 after=None):
+                 after=None,
+                 before=None
+                ):
         '''
         Create a time series. Parameters are:
 
@@ -50,7 +52,8 @@ class Timeseries( object ):
         xyz0            Reference xyz coordinate for calculated enu components
         xyzenu          Reference xyz coordinate for calculated enu components
         transform       A transformation function applied to the XYZ coordinates 
-        after           The earliest date for data of interest
+        after           The earliest date of interest
+        before          The latest date of interest
         '''
 
         self._loaded=False
@@ -59,7 +62,9 @@ class Timeseries( object ):
         self._xyz0=xyz0
         self._xyzenu=xyzenu
         self._transform=transform
-        self._after=after
+        self._before=None
+        self._after=None
+        self.setDateRange(after=after,before=before)
         if xyz is not None and dates is not None:
             data=pd.DataFrame(xyz,columns=('x','y','z'))
             data.set_index(pd.to_datetime(dates),inplace=True)
@@ -85,6 +90,9 @@ class Timeseries( object ):
         
         if self._after is not None:
             data=data[data.index > self._after]
+
+        if self._before is not None:
+            data=data[data.index < self._before]
 
         data.sort_index(inplace=True)
         xyz=np.vstack((data.x,data.y,data.z)).T
@@ -127,6 +135,18 @@ class Timeseries( object ):
             self._loaded=False
         if transform != self._transform:
             self._transform=transform
+            self._loaded=False
+
+    def setDateRange( self, after=None, before=None ):
+        if after is not None: 
+            if isinstance(after,basestring):
+                after=dt.datetime.strptime(after,'%Y-%m-%d')
+            self._after=after
+            self._loaded=False
+        if before is not None: 
+            if isinstance(before,basestring):
+                before=dt.datetime.strptime(before,'%Y-%m-%d')
+            self._before=before
             self._loaded=False
 
     def xyz0( self ):
@@ -264,8 +284,9 @@ class SqliteTimeseries( Timeseries ):
 
     _sql='''
         select epoch, code as code, X as x, Y as y, Z as z 
-        from mark_coordinate 
+        from mark_coordinate m
         where code=? and solution_type=?
+        {when}
         order by epoch
         '''
 
@@ -288,6 +309,7 @@ class SqliteTimeseries( Timeseries ):
             m.code = ? and
             m.epoch=v.epoch and
             {case} = v.version
+            {when}
         order by m.epoch
         '''
 
@@ -305,7 +327,7 @@ class SqliteTimeseries( Timeseries ):
         return db
 
     @staticmethod
-    def seriesList( dbfile, solutiontype=None,after=None ):
+    def seriesList( dbfile, solutiontype=None,after=None,before=None ):
         db=SqliteTimeseries._openDb( dbfile )
         seriescodes=pd.read_sql(SqliteTimeseries._sqlList, db )
         db.close()
@@ -313,11 +335,11 @@ class SqliteTimeseries( Timeseries ):
         for i in seriescodes.index:
             code,solntype=(seriescodes.code[i],seriescodes.solution_type[i])
             if solutiontype is None or solutiontype == solntype:
-                series.append(SqliteTimeseries(dbfile,code,solntype,after=after))
+                series.append(SqliteTimeseries(dbfile,code,solntype,after=after,before=before))
         return series
 
-    def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None ):
-        Timeseries.__init__( self, code, solutiontype=solutiontype, xyz0=xyz0, transform=transform, after=after )
+    def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None, before=None ):
+        Timeseries.__init__( self, code, solutiontype=solutiontype, xyz0=xyz0, transform=transform, after=after, before=before )
         self._dbfile=dbfile
 
     def _loadData( self ):
@@ -325,7 +347,8 @@ class SqliteTimeseries( Timeseries ):
         solntype=self.solutiontype()
         code=self.code()
         if '+' not in solntype:
-            data=pd.read_sql(SqliteTimeseries._sql,db,params=(code,solntype),index_col='epoch')
+            sql=SqliteTimeseries._sql
+            params=[code,solntype]
         else:
             types=solntype.split('+')
             casesql='CASE solution_type'
@@ -341,7 +364,16 @@ class SqliteTimeseries( Timeseries ):
             params.append(len(types))
             params.append(code)
             params.extend(types)
-            data=pd.read_sql(sql,db,params=params,index_col='epoch')
+            
+        when=''
+        if self._before is not None:
+            when=' and m.epoch < ?'
+            params.append(self._before.strftime('%Y-%m-%d'))
+        if self._after is not None:
+            when=when+' and m.epoch > ?'
+            params.append(self._after.strftime('%Y-%m-%d'))
+        sql=sql.replace('{when}',when)
+        data=pd.read_sql(sql,db,params=params,index_col='epoch')
         db.close()
         #, parse_dates=['epoch'])
         data.set_index(pd.to_datetime(data.index),inplace=True)
@@ -372,7 +404,7 @@ class FileTimeseries( Timeseries ):
     _epoch_col='epoch'
 
     @staticmethod
-    def seriesList( filepattern, solutiontype='default',after=None ):
+    def seriesList( filepattern, solutiontype='default',after=None,before=None ):
         '''
         Get the potential time series files, any file matching the filepattern.  The 
         pattern can include {code} in the filename to represent the code to use
@@ -391,12 +423,12 @@ class FileTimeseries( Timeseries ):
             if path:
                 fn=os.path.join(path,fn)
             code=match.group('code')
-            series.append(FileTimeseries(fn,code,solutiontype,after=after))
+            series.append(FileTimeseries(fn,code,solutiontype,after=after,before=before))
         return series
 
 
-    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None, after=None ):
-        Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after)
+    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None, after=None, before=None ):
+        Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after,before=before)
         self._filename=filename
 
     def _loadData( self ):
@@ -457,12 +489,16 @@ class TimeseriesList( list ):
             solutiontypes[f.solutiontype()]=1
         return sorted(solutiontypes.keys())
 
-    def timeseries( self, code, solutiontype=[] ):
+    def timeseries( self, code, solutiontype=[], before=None, after=None ):
         '''
         Return the time series for the requested station codes.  Can
         specify a solution type wanted, or a list of solution types in
         order of preference.  If solutiontype is not specified then
         an error will be raised if there is more than one matching solution.
+
+        The time series can be restricted to a date range by using before and after
+        parameters.  These can be python datetime.datetime objects, or strings formatted
+        as yyyy-mm-dd.
         '''
         if isinstance(solutiontype,basestring):
             solutiontype=[solutiontype] 
@@ -484,6 +520,7 @@ class TimeseriesList( list ):
                 raise RuntimeError('Ambiguous time series requested - multiple solution types')
         if not potential:
             raise RuntimeError('No time series found for requested station '+code)
+        potential.setDateRange(before=before,after=after)
         return potential
 
 
