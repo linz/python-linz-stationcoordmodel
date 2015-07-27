@@ -219,7 +219,7 @@ class Timeseries( object ):
         self._load()
         return self._data.index
 
-    def plot( self, detrend=False, samescale=False, **kwds ):
+    def plot( self, detrend=False, samescale=False, symbol=None, baseplot=None, **kwds ):
         '''
         Plot the time series onto 3 separate graphs
 
@@ -229,35 +229,71 @@ class Timeseries( object ):
            Additional keywords are passed to the pyplot.subplots function
            call.
         '''
-        self._load()
 
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
 
-        title="{0} {1} timeseries".format(self._code,self._solutiontype)
-        if detrend:
-            title=title+' detrended'
-
-        settings={'sharex':True,'sharey':samescale,'figsize':(8,6),'dpi':100}
-        settings.update(kwds)
-        fig, plots=plt.subplots(3,1,**settings)
-        fig.suptitle(title)
-        data=self._data
-        
+        default_symbols=['b+','r+','g+']
         axis_labels=('East)','North','Up')
+
+        havebase=True
+        if baseplot is None:
+            havebase=False
+            baseplot={}
+            title="{0} {1} timeseries".format(self._code,self._solutiontype)
+            if detrend:
+                title=title+' detrended'
+
+            settings={'sharex':True,'sharey':samescale,'figsize':(8,6),'dpi':100}
+            settings.update(kwds)
+            fig, plots=plt.subplots(3,1,**settings)
+            fig.suptitle(title)
+            baseplot['plots']=plots
+            baseplot['trends']=[None,None,None]
+            baseplot['symbols']=[]
+        else:
+            self.setXyzTransform(xyz0=baseplot['xyz0'],xyzenu=baseplot['xyzenu'])
+
+        self._load()
+        data=self._data
+        if not havebase:
+            baseplot['xyz0']=self._xyz0
+            baseplot['xyzenu']=self._xyzenu
+        plots=baseplot['plots']
+
+        if symbol is None:
+            for s in default_symbols:
+                if s not in baseplot['symbols']:
+                    symbol=s
+                    baseplot['symbols'].append(s)
+                    break
+            if symbol is None:
+                symbol=default_symbols[0]
+
+            
         for i,axis in enumerate(('e','n','u')):
             series=data[axis]
             ylabel=axis_labels[i]
-            if detrend:
+            trendp=None
+            days=None
+            if detrend and not havebase:
                 days=mdates.date2num(data.index)
                 trendp=np.poly1d(np.polyfit(days,series,1))
+                baseplot['trends'][i]=trendp
+            else:
+                trendp=baseplot['trends'][i]
+            if trendp is not None:
+                if days is None:
+                    days=mdates.date2num(data.index)
                 trend=trendp(days)
                 series=(series-trend)*1000
                 ylabel=ylabel+' mm'
-            plots[i].plot(data.index,series,'b+',label='Time series',picker=5)
-            plots[i].set_ylabel(ylabel)
-            plots[i].tick_params(labelsize=8)
-            plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
+            plots[i].plot(data.index,series,symbol,label=self._solutiontype,picker=5)
+            if not havebase:
+                plots[i].set_ylabel(ylabel)
+                plots[i].tick_params(labelsize=8)
+                plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
+        return baseplot
 
     def compare( self, other, newcode=None, newtype=None ):
         '''
