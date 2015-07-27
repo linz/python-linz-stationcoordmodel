@@ -138,12 +138,12 @@ class Timeseries( object ):
             self._loaded=False
 
     def setDateRange( self, after=None, before=None ):
-        if after is not None: 
+        if after is not None and after != self._after: 
             if isinstance(after,basestring):
                 after=dt.datetime.strptime(after,'%Y-%m-%d')
             self._after=after
             self._loaded=False
-        if before is not None: 
+        if before is not None and before != self._before: 
             if isinstance(before,basestring):
                 before=dt.datetime.strptime(before,'%Y-%m-%d')
             self._before=before
