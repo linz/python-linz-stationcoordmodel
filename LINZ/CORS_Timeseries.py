@@ -505,13 +505,13 @@ class FileTimeseries( Timeseries ):
 
 class TimeseriesList( list ):
 
-    def __init__( self, source=None, solutiontype=None, after=None ):
+    def __init__( self, source=None, solutiontype=None, after=None, before=None ):
         list.__init__(self)
         if source is not None:
             if os.path.isfile(source):
-                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after ))
+                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before ))
             else:
-                self.extend(FileTimeseries.seriesList(source,solutiontype, after))
+                self.extend(FileTimeseries.seriesList(source,solutiontype, after=after, before=before))
 
     def codes( self ):
         codes={}
