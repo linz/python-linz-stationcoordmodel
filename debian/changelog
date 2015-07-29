@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.14.0-1) trusty; urgency=medium
+
+  * Adding timeseries and list comparison code
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 30 Jul 2015 10:57:45 +1200
+
 python-linz-stationcoordmodel (1.13.0-1) trusty; urgency=medium
 
   * Adding checking on before/after dates
