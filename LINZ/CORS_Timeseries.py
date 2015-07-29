@@ -295,7 +295,7 @@ class Timeseries( object ):
                 plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
         return baseplot
 
-    def compare( self, other, newcode=None, newtype=None ):
+    def subtractFrom( self, other, newcode=None, newtype=None ):
         '''
         Returns a time series comparing two others
 
@@ -315,6 +315,53 @@ class Timeseries( object ):
         xyz0=[0,0,0]
         xyzenu=self._xyzenu if self._xyzenu is not None else self._xyz0
         return Timeseries(newcode,newtype,data=data,xyz0=xyz0,xyzenu=xyzenu)
+
+
+    class Comparison( object ):
+
+        def __init__(self, ts1, ts2, newcode=None, newtype=None):
+            '''
+            Represents a comparison of two time series, with elements ts1, ts2, diff
+            '''
+            self.ts1=ts1
+            self.ts2=ts2
+            self.diff=ts1.subtractFrom(ts2,newcode=newcode,newtype=newtype)
+
+        def plot( self, detrend=True ):
+            '''
+            Plot the two time series overlaid
+            '''
+            p1=self.ts1.plot(detrend=detrend)
+            p1=self.ts2.plot(baseplot=p1)
+
+        def plotDiff( self ):
+            '''
+            Plot the difference
+            '''
+            self.diff.plot()
+
+        def stats( self ):
+            '''
+            Return the stats of the difference
+            '''
+            return self.diff.getData().describe()
+                
+        def printDetrendedStats( self ):
+            '''
+            Print the stats for each time series.
+            '''
+            ts1=self.ts1
+            ts2=self.ts2
+            rsets1=robustStandardError(ts1.getObs()[1])
+            rsets2=robustStandardError(ts2.getObs()[1])
+            ts1=ts1.getData()-ts1.trend()
+            ts2=ts2.getData()-ts2.trend()
+            print self.ts1_solution,"solution detrended stats"
+            print ts1.describe()
+            print "Robust SE: ",rsets1
+            print self.ts2_solution,"solution detrended stats"
+            print ts2.describe()
+            print "Robust SE: ",rsets2
 
 class SqliteTimeseries( Timeseries ):
 
@@ -525,7 +572,7 @@ class TimeseriesList( list ):
             solutiontypes[f.solutiontype()]=1
         return sorted(solutiontypes.keys())
 
-    def timeseries( self, code, solutiontype=[], before=None, after=None ):
+    def get( self, code, solutiontype=[], after=None, before=None ):
         '''
         Return the time series for the requested station codes.  Can
         specify a solution type wanted, or a list of solution types in
@@ -559,8 +606,80 @@ class TimeseriesList( list ):
         potential.setDateRange(before=before,after=after)
         return potential
 
+    def compareWith( self, other, after=None, before=None ):
+        '''
+        Return a TimeseriesList.Comparison object
+        '''
+        return TimeseriesList.Comparison( self, other, after=after, before=before )
 
+    class Comparison( object ):
+        '''
+        Class representing a comparison between two time series lists.
+        '''
 
+        def __init__( self, ts1, ts2,after=None,before=None):
+            self.ts1=ts1
+            self.ts2=ts2
+            codes1=self.ts1.codes()
+            codes2=self.ts2.codes()
+            self.before=before
+            self.after=after
+            self.codes=[c for c in codes1 if c in codes2]
+            self.codes.sort()
 
+        def get(self,code, after=None, before=None, plot=False, plotDiff=False, stats=False, detrend=True):
+            '''
+            Returns the difference between two time series.  Returns a Timeseries.Comparison object
+            '''
 
+            after=after or self.after
+            before=before or self.before
+            ts1=self.ts1.get(code,after=after,before=before)
+            ts2=self.ts2.get(code,after=after,before=before)
+            comparison=Timeseries.Comparison(ts1,ts2)
+            if plot: 
+                comparison.plot(detrend=detrend)
+            if plotDiff: 
+                comparison.plotDiff()
+            if stats: 
+                print comparison.stats()
+            return comparison
 
+        def stats( self ):
+            '''
+            Get summary statistics for common stations between the two time series.
+            Returns a DataFrame indexed on code, with columns rse_sol1_[enu], 
+            rse_sol2_[enu] where sol1 and sol2 are the solution type,s and then 
+            diff_e, std_diff_e, diff_n, std_diff_n, diff_u, std_diff_u, where diff
+            and 
+
+            '''
+            data=[]
+            stype1='ts1'
+            stype2='ts2'
+            for code in self.codes:
+                cmp=self.get(code)
+                stype1=cmp.ts1.solutiontype()
+                stype2=cmp.ts2.solutiontype()
+                row=[code]
+                for ts in (cmp.ts1,cmp.ts2):
+                    row.extend(robustStandardError(ts.getObs()[1]))
+                stats=cmp.diff.getData().describe()
+                row.extend((
+                    stats.loc['mean','e'],
+                    stats.loc['std','e'],
+                    stats.loc['mean','n'],
+                    stats.loc['std','n'],
+                    stats.loc['mean','u'],
+                    stats.loc['std','u'],
+                ))
+                data.append(row)
+
+            columns=['code']
+            columns.extend((stype1+'_rse_e',stype1+'_rse_n',stype1+'_rse_u'))
+            columns.extend((stype2+'_rse_e',stype2+'_rse_n',stype2+'_rse_u'))
+            columns.extend(('diff_mean_e','diff_sdt_e','diff_mean_n','diff_std_n','diff_mean_u','diff_std_u'))
+            result=pd.DataFrame(data,columns=columns)
+            result.set_index(result.code,inplace=True)
+            result.dropna(inplace=True)
+            return result
