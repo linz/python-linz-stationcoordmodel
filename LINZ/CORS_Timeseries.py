@@ -295,7 +295,7 @@ class Timeseries( object ):
                 plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
         return baseplot
 
-    def subtractFrom( self, other, newcode=None, newtype=None ):
+    def subtractFrom( self, other, newcode=None, newtype=None, normalize=False ):
         '''
         Returns a time series comparing two others
 
@@ -308,8 +308,8 @@ class Timeseries( object ):
             newcode=self._code
         if newtype is None:
             newtype=other._solutiontype+'-'+self._solutiontype
-        d1=self.getData(enu=False)
-        d2=other.getData(enu=False)
+        d1=self.getData(enu=False, normalize=normalize)
+        d2=other.getData(enu=False, normalize=normalize)
         join=d1.join(d2,rsuffix='2',how='inner')
         data=pd.DataFrame(data={'x':join.x2-join.x,'y':join.y2-join.y,'z':join.z2-join.z})
         xyz0=[0,0,0]
@@ -319,13 +319,13 @@ class Timeseries( object ):
 
     class Comparison( object ):
 
-        def __init__(self, ts1, ts2, newcode=None, newtype=None):
+        def __init__(self, ts1, ts2, newcode=None, newtype=None, normalize=False):
             '''
             Represents a comparison of two time series, with elements ts1, ts2, diff
             '''
             self.ts1=ts1
             self.ts2=ts2
-            self.diff=ts1.subtractFrom(ts2,newcode=newcode,newtype=newtype)
+            self.diff=ts1.subtractFrom(ts2,newcode=newcode,newtype=newtype,normalize=normalize)
 
         def plot( self, detrend=True ):
             '''
@@ -606,24 +606,25 @@ class TimeseriesList( list ):
         potential.setDateRange(before=before,after=after)
         return potential
 
-    def compareWith( self, other, after=None, before=None ):
+    def compareWith( self, other, after=None, before=None, normalize=False ):
         '''
         Return a TimeseriesList.Comparison object
         '''
-        return TimeseriesList.Comparison( self, other, after=after, before=before )
+        return TimeseriesList.Comparison( self, other, after=after, before=before, normalize=normalize )
 
     class Comparison( object ):
         '''
         Class representing a comparison between two time series lists.
         '''
 
-        def __init__( self, ts1, ts2,after=None,before=None):
+        def __init__( self, ts1, ts2,after=None,before=None,normalize=False):
             self.ts1=ts1
             self.ts2=ts2
             codes1=self.ts1.codes()
             codes2=self.ts2.codes()
             self.before=before
             self.after=after
+            self.normalize=normalize
             self.codes=[c for c in codes1 if c in codes2]
             self.codes.sort()
 
@@ -636,7 +637,7 @@ class TimeseriesList( list ):
             before=before or self.before
             ts1=self.ts1.get(code,after=after,before=before)
             ts2=self.ts2.get(code,after=after,before=before)
-            comparison=Timeseries.Comparison(ts1,ts2)
+            comparison=Timeseries.Comparison(ts1,ts2,normalize=self.normalize)
             if plot: 
                 comparison.plot(detrend=detrend)
             if plotDiff: 
@@ -664,21 +665,30 @@ class TimeseriesList( list ):
                 row=[code]
                 for ts in (cmp.ts1,cmp.ts2):
                     row.extend(robustStandardError(ts.getObs()[1]))
-                stats=cmp.diff.getData().describe()
+                diff=cmp.diff.getData()
+                stats=diff.describe()
+                stats2=np.abs(diff).describe()
                 row.extend((
                     stats.loc['mean','e'],
                     stats.loc['std','e'],
+                    stats2.loc['max','e'],
                     stats.loc['mean','n'],
                     stats.loc['std','n'],
+                    stats2.loc['max','n'],
                     stats.loc['mean','u'],
                     stats.loc['std','u'],
+                    stats2.loc['max','u'],
                 ))
                 data.append(row)
 
             columns=['code']
             columns.extend((stype1+'_rse_e',stype1+'_rse_n',stype1+'_rse_u'))
             columns.extend((stype2+'_rse_e',stype2+'_rse_n',stype2+'_rse_u'))
-            columns.extend(('diff_mean_e','diff_sdt_e','diff_mean_n','diff_std_n','diff_mean_u','diff_std_u'))
+            columns.extend((
+                'diff_mean_e','diff_sdt_e','diff_maxabs_e',
+                'diff_mean_n','diff_std_n','diff_maxabs_n',
+                'diff_mean_u','diff_std_u','diff_maxabs_u',
+                ))
             result=pd.DataFrame(data,columns=columns)
             result.set_index(result.code,inplace=True)
             result.dropna(inplace=True)
