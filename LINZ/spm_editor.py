@@ -309,13 +309,13 @@ class AppForm(QMainWindow):
         self.createMenu()
         self.createMainFrame()
         self.createStatusBar()
-        if spmfile:
-            self.codelist.hide()
-            self.modelsonly.hide()
-            tsfile=tsfile or self.timeseries_file
-            self.loadModel(spmfile,tsfile)
-        else:
-            self.reloadCodeList()
+        #if spmfile:
+        #    self.codelist.hide()
+        #    self.modelsonly.hide()
+        #    tsfile=tsfile or self.timeseries_file
+        #    self.loadModel(spmfile,tsfile)
+        #else:
+        self.reloadCodeList()
 
     def read_config(self,cfgfile,options=None):
         config={x:None for x in 'model_file model_backup_file timeseries_file timeseries_type update_availability'.split()}
@@ -474,13 +474,13 @@ class AppForm(QMainWindow):
         if not self.checkSaveModel(canCancel=True):
             return
         modelFile = self.modelFile(code)
-        self.loadModel(modelFile,self.timeseries_file,code)
+        self.loadModel(modelFile,code)
 
-    def loadModel(self,modelFile,timeseriesFile,code=None):
+    def loadModel(self,modelFile,code=None):
         loadfile=os.path.exists(modelFile)
         self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
         code=self.model.station
-        timeseries=self.timeseries_list.timeseries(code,self.solutiontypes)
+        timeseries=self.timeseries_list.get(code,self.solutiontypes)
         self.model.loadTimeSeries(timeseries)
         if not loadfile:
             self.backedup.add(code)
