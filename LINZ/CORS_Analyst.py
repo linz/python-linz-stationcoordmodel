@@ -7,13 +7,10 @@ from ConfigParser import SafeConfigParser
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
-from LINZ.Geodetic.Ellipsoid import GRS80
-from LINZ.Geodetic import GDB
-from LINZ import CORS_Timeseries
-from LINZ.DeformationModel.Model import Model as DeformationModel
-from LINZ.DeformationModel.ITRF_NZGD2000 import Transformation as ITRF_Transformation
 from LINZ.StationCoordinateModel import Model as StationCoordinateModel
-# from StationCoordinateModel import Model as StationCoordinateModel
+
+import CORS_Timeseries
+import GDB_Timeseries
 
 StationData=namedtuple('StationData','code timeseries stationCoordModel scmTimeseries gdbTimeseries')
 StationOffsetStats=namedtuple('StationOffsetStats','date gdbOffset scmOffset')
@@ -62,15 +59,11 @@ class CORS_Analyst( object ):
 
     def loadDeformationModel(self):
         path=self._cfg.get(self._configgroup,'deformation_model_path')
-        mod = DeformationModel(path)
-        self.deformationModelVersion=mod.version()
-        self._itrftrans=ITRF_Transformation( modeldir=path, toNZGD2000=False, itrf='ITRF2008')
+        self.gdbCalculator=GDB_Timeseries.GDB_Timeseries_Calculator( path )
+        self.deformationModelVersion=self.gdbCalculator.deformationModelVersion()
 
     def gdbTimeseries( self, code, dates, xyz0=None ):
-        markdata=GDB.get(code)
-        lon,lat,hgt=markdata.official_coordinate
-        markitrf=[GRS80.xyz(self._itrftrans(lon,lat,hgt,d)) for d in dates]
-        gdbts=CORS_Timeseries.Timeseries(code,solutiontype='gdb',dates=dates,xyz=markitrf,xyz0=xyz0)
+        gdbts=self.gdbCalculator.get(code,dates=dates,xyz0=xyz0)
         return gdbts
 
     def scmTimeseries( self, model, dates ):
