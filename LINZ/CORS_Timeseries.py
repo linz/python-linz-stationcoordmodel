@@ -295,9 +295,9 @@ class Timeseries( object ):
                 plots[i].format_xdata=mdates.DateFormatter('%d-%m-%Y')
         return baseplot
 
-    def subtractFrom( self, other, newcode=None, newtype=None, normalize=False ):
+    def subtract( self, other, newcode=None, newtype=None, normalize=False ):
         '''
-        Returns a time series comparing two others
+        Returns a time series subtracting other from the current series
 
         By default requires that both series have the same code.  Will
         return an error if not.  Over-ride by including a newcode parameter
@@ -311,7 +311,7 @@ class Timeseries( object ):
         d1=self.getData(enu=False, normalize=normalize)
         d2=other.getData(enu=False, normalize=normalize)
         join=d1.join(d2,rsuffix='2',how='inner')
-        data=pd.DataFrame(data={'x':join.x2-join.x,'y':join.y2-join.y,'z':join.z2-join.z})
+        data=pd.DataFrame(data={'x':join.x-join.x2,'y':join.y-join.y2,'z':join.z-join.z2})
         xyz0=[0,0,0]
         xyzenu=self._xyzenu if self._xyzenu is not None else self._xyz0
         return Timeseries(newcode,newtype,data=data,xyz0=xyz0,xyzenu=xyzenu)
@@ -322,10 +322,11 @@ class Timeseries( object ):
         def __init__(self, ts1, ts2, newcode=None, newtype=None, normalize=False):
             '''
             Represents a comparison of two time series, with elements ts1, ts2, diff
+            Diff is in the sense ts1-ts2
             '''
             self.ts1=ts1
             self.ts2=ts2
-            self.diff=ts1.subtractFrom(ts2,newcode=newcode,newtype=newtype,normalize=normalize)
+            self.diff=ts1.subtract(ts2,newcode=newcode,newtype=newtype,normalize=normalize)
 
         def plot( self, detrend=True ):
             '''
@@ -608,7 +609,8 @@ class TimeseriesList( list ):
 
     def compareWith( self, other, after=None, before=None, normalize=False ):
         '''
-        Return a TimeseriesList.Comparison object
+        Return a TimeseriesList.Comparison object which compares this list with other (results are in the
+        sense self-other)
         '''
         return TimeseriesList.Comparison( self, other, after=after, before=before, normalize=normalize )
 
