@@ -695,3 +695,65 @@ class TimeseriesList( list ):
             result.set_index(result.code,inplace=True)
             result.dropna(inplace=True)
             return result
+
+
+
+class SqliteTimeseriesList( TimeseriesList ):
+
+    def __init__( self, source=None, solutiontype=None, after=None, before=None ):
+        if not os.path.isfile(source):
+            raise RuntimeError("SqliteTimeseriesList source is not a file: "+str(source))
+        self._dbfile=source
+        self._solutiontype=solutiontype
+        TimeseriesList.__init__(self,source=source,solutiontype=solutiontype,after=after,before=before)
+
+    def solutionTypes( self ):
+        _sqlTypes='''
+            select distinct solution_type from mark_coordinate m
+            '''
+        db=SqliteTimeseries._openDb( self._dbfile )
+        types=pd.read_sql(SqliteTimeseries._sqlTypes, db )
+        db.close()
+        return [types.solution_type[i] for i in types.index]
+        
+    def stationCoordinates( self, date, solutiontype=None, selectday=False ):
+        '''
+        Return a DataFrame of stations and coordinates that apply at a specific
+        epoch, or during a (UTC) day.
+        '''
+
+        sql='''
+            select code as code, solution_type as solutiontype, epoch, X as x, Y as y, Z as z 
+            from mark_coordinate m
+            where solution_type=?
+            {when}
+            order by code
+            '''
+        db=SqliteTimeseries._openDb( self._dbfile )
+
+        solutiontype=solutiontype or self._solutiontype
+        if solutiontype is None:
+            types=self.solutionTypes()
+            if len(types) == 1:
+                solutiontype=type
+            else:
+                raise RuntimeError('Ambiguous solution types in SqliteTimeseriesList.stationCoordinates')
+        elif '+' in solutiontype:
+            raise RuntimeError('Cannot use SqliteTimeseriesList.stationCoordinates with multiple solution types')
+
+        params=[solutiontype]
+        when=''
+        dateformat="%Y-%m-%d %H:%M:%S"
+        if selectday:
+            when='and epoch between ? and ?'
+            params.extend([
+                dt.datetime(date.year,date.month,date.day,0,0,0).strftime(dateformat),
+                dt.datetime(date.year,date.month,date.day,23,59,59).strftime(dateformat)
+            ])
+        else:
+            when='and epoch=?'
+            params.append(date.strftime(dateformat))
+        sql=sql.replace('{when}',when)
+        data=pd.read_sql(sql,db,params=params,index_col='code')
+        db.close()
+        return data
