@@ -3,6 +3,12 @@
 # official coordinate from the geodetic database and the NZGD2000 deformation
 # model.  
 
+# Imports to support python 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from datetime import datetime, timedelta
 from collections import namedtuple
 
@@ -11,7 +17,7 @@ from LINZ.Geodetic import GDB
 from LINZ.DeformationModel.Model import Model as DeformationModel
 from LINZ.DeformationModel.ITRF_NZGD2000 import Transformation as ITRF_Transformation
 from LINZ.StationCoordinateModel import Model as StationCoordinateModel
-import CORS_Timeseries
+from . import CORS_Timeseries
 
 
 class GDB_Timeseries_Calculator( object ):

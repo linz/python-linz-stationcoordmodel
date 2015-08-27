@@ -1,10 +1,18 @@
+
+# Imports to support python 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 import os
 import os.path
 import re
 import argparse
 from datetime import datetime,date
-from LINZ.StationCoordinateModel import Model as spm
+
+from .StationCoordinateModel import Model as spm
 
 def main():
     calcDate=datetime(date.today().year,1,1)
@@ -90,7 +98,7 @@ def main():
             if code not in gdbcrds:
                 continue
 
-            print "Processing",code
+            print("Processing",code)
 
             try:
                 m=spm(filename=stndir+'/'+f)
@@ -132,7 +140,7 @@ def main():
                     csvu.write('"{0}",{1:.9f},{2:.9f},{3:.4f},"B10","NZGD2000","2000.01.01"\n'.format(
                         code.upper(),*llhnz2k))
             except:
-                print sys.exc_info()[1]
+                print(sys.exc_info()[1])
 
 if __name__=="__main__":
     main()

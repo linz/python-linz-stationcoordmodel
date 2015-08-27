@@ -1,3 +1,10 @@
+
+# Imports to support python 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 import os
 import os.path
@@ -357,12 +364,12 @@ class Timeseries( object ):
             rsets2=robustStandardError(ts2.getObs()[1])
             ts1=ts1.getData()-ts1.trend()
             ts2=ts2.getData()-ts2.trend()
-            print self.ts1_solution,"solution detrended stats"
-            print ts1.describe()
-            print "Robust SE: ",rsets1
-            print self.ts2_solution,"solution detrended stats"
-            print ts2.describe()
-            print "Robust SE: ",rsets2
+            print(self.ts1_solution,"solution detrended stats")
+            print(ts1.describe())
+            print("Robust SE: ",rsets1)
+            print(self.ts2_solution,"solution detrended stats")
+            print(ts2.describe())
+            print("Robust SE: ",rsets2)
 
 class SqliteTimeseries( Timeseries ):
 
@@ -645,7 +652,7 @@ class TimeseriesList( list ):
             if plotDiff: 
                 comparison.plotDiff()
             if stats: 
-                print comparison.stats()
+                print(comparison.stats())
             return comparison
 
         def stats( self ):

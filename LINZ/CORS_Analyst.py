@@ -1,3 +1,10 @@
+
+# Imports to support python 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 import os.path
 from datetime import datetime
@@ -7,10 +14,11 @@ from ConfigParser import SafeConfigParser
 import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
-from LINZ.StationCoordinateModel import Model as StationCoordinateModel
 
-import CORS_Timeseries
-import GDB_Timeseries
+from .StationCoordinateModel import Model as StationCoordinateModel
+
+from . import CORS_Timeseries
+from . import GDB_Timeseries
 
 StationData=namedtuple('StationData','code timeseries stationCoordModel scmTimeseries gdbTimeseries')
 StationOffsetStats=namedtuple('StationOffsetStats','date gdbOffset scmOffset')
@@ -32,7 +40,7 @@ class CORS_Analyst( object ):
             sys.exit()
 
         if self._verbose:
-            print "Reading configuration from",self._configfile
+            print("Reading configuration from",self._configfile)
 
         cfg=SafeConfigParser()
         cfg.readfp(open(self._configfile))
@@ -178,8 +186,8 @@ class CORS_Analyst( object ):
                          "{0} {1} {2} vertical offset {3:.4f} m exceeds tolerance {4:.4f} m \n"
                          .format(code,testtype,teststat,testv,levels[1]))
             if self._verbose:
-                print "  {0} coordinates are significantly offset ({1:.4f} {2:.4f} m)".format(
-                    testtype,testh,testv)
+                print("  {0} coordinates are significantly offset ({1:.4f} {2:.4f} m)".format(
+                    testtype,testh,testv))
 
         results['status']=status
         results['status_message']=message
@@ -187,7 +195,7 @@ class CORS_Analyst( object ):
 
     def compileStationData( self, code ):
         if self._verbose:
-            print "Compiling data for",code
+            print("Compiling data for",code)
         stndata=self.getStationData( code )
         offsets=self.getStationOffsets( stndata, self._offsetdays )
         stnresults={
@@ -262,7 +270,7 @@ class CORS_Analyst( object ):
             except KeyboardInterrupt:
                 break
             except:
-                print "Station "+c+": "+str(sys.exc_info()[1])
+                print("Station "+c+": "+str(sys.exc_info()[1]))
         results['station_summary']=coderesults
         self.writeResultsJSON(results)
         return results

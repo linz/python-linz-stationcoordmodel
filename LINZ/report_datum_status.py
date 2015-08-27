@@ -1,5 +1,11 @@
 #!/usr/bin/python
 
+# Imports to support python 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 import os.path
 import argparse
@@ -171,7 +177,7 @@ def main():
     if args.dump_config_file:
         cfgfile=os.path.splitext(__file__)[0]+'.cfg'
         with open(cfgfile) as cfgf:
-            print cfgf.read()
+            print(cfgf.read())
             sys.exit()
 
     config=get_configuration(args.config_file,args.config_section)
@@ -212,7 +218,7 @@ def main():
         if notified is not None and notificationFile is not None:
             saveNotificationStatus(notificationFile,notified)
     except:
-        print str(sys.exc_info()[1])
+        print(str(sys.exc_info()[1]))
 
 
 if __name__=="__main__":

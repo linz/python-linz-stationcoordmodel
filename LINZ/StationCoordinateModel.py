@@ -6,14 +6,15 @@ from scipy.optimize import leastsq
 from scipy.special import erf
 from xml.dom import minidom
 from xml.etree import ElementTree
-from CORS_Timeseries import Timeseries, FileTimeseries, robustStandardError
 import argparse
-from LINZ.Geodetic.Ellipsoid import GRS80
 import math
 import numpy as np
 import os.path
 import re
 import sys
+
+from LINZ.Geodetic.Ellipsoid import GRS80
+from .CORS_Timeseries import Timeseries, FileTimeseries, robustStandardError
 
 '''
 StationCoordinateModel:
@@ -1627,7 +1628,7 @@ def main():
 
         if args.start_date is None:
             if not args.quiet:
-                print spm
+                print(spm)
         else:
             days=[]
             if args.end_date is None and os.path.exists(args.start_date):
@@ -1652,17 +1653,17 @@ def main():
                 xyz=spm.calc(sdate,calcenu)
                 if calcenu:
                     xyz *= 1000.0;
-                print format.format(sdate,xyz[0],xyz[1],xyz[2])
+                print(format.format(sdate,xyz[0],xyz[1],xyz[2]))
                 if args.debug_calcs:
                     for c in m.components:
                         if c.enabled():
                             xyz = c.calc(days_array(sdate))[0]*1000.0
-                            print "{0}\t{1:.1f}\t{2:.1f}\t{3:.1f}".format(
-                                c.componentType(),xyz[0],xyz[1],xyz[2])
+                            print("{0}\t{1:.1f}\t{2:.1f}\t{3:.1f}".format(
+                                c.componentType(),xyz[0],xyz[1],xyz[2]))
 
     except:
         msg=str(sys.exc_info()[1])
-        print "Error: "+msg
+        print("Error: "+msg)
 
 if __name__ == '__main__':
     main()

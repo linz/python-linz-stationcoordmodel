@@ -7,6 +7,13 @@ Eli Bendersky (eliben@gmail.com)
 License: this code is in the public domain
 Last modified: 19.01.2009
 """
+
+# Imports to support python 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import sys
 import os
 import os.path
@@ -25,8 +32,8 @@ import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
 import numpy as np
 
-import StationCoordinateModel as spm
-from CORS_Timeseries import TimeseriesList, robustStandardError
+from . import StationCoordinateModel as spm
+from .CORS_Timeseries import TimeseriesList, robustStandardError
 
 help_file='spm_editor_help.html'
 default_model_file='stations/{code}.xml'
@@ -574,11 +581,9 @@ class AppForm(QMainWindow):
 
     def replot(self):
         if not self.model:
-            # print "No model loaded!"
             return
         dates,obs,useobs = self.model.getObs()
         if dates==None or obs==None or len(obs) == 0:
-            # print "Nothing to plot!"
             return
         plotdays = self.timeasdays.isChecked()
         days=spm.days_array(dates)
@@ -954,7 +959,7 @@ def main():
     if args.example_config_file:
         examplefile=os.path.splitext(__file__)[0]+'.cfg'
         with open(examplefile) as f:
-            print f.read()
+            print(f.read())
         sys.exit()
 
     if args.model_file:
