@@ -1,3 +1,15 @@
+python-linz-stationcoordmodel (1.14.1-1) trusty; urgency=medium
+
+  * Adding capability to normalize timeseries to daily time marks in comparison functions
+  * Fixing for changes to CORS_Timeseries
+  * Extracting GDB time series function from CORS_Analyst
+  * Adding GDB_CoordinateUpdateCsv.py to support cors_gdb_editor
+  * Reversing the sense of comparisons to be more intuitive
+  * Adding SqliteTimeseriesList and support for getting info for a particular epoch
+  * Updating for python3 compatibility
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 27 Aug 2015 13:31:46 +1200
+
 python-linz-stationcoordmodel (1.14.0-1) trusty; urgency=medium
 
   * Adding timeseries and list comparison code
