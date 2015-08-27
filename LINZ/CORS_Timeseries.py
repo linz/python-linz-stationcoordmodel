@@ -240,8 +240,8 @@ class Timeseries( object ):
         import matplotlib.pyplot as plt
         import matplotlib.dates as mdates
 
-        default_symbols=['b+','r+','g+']
-        axis_labels=('East)','North','Up')
+        default_symbols=['b+','r+','g+','m+']
+        axis_labels=('East','North','Up')
 
         havebase=True
         if baseplot is None:
@@ -295,7 +295,7 @@ class Timeseries( object ):
                 trend=trendp(days)
                 series=(series-trend)*1000
                 ylabel=ylabel+' mm'
-            plots[i].plot(data.index,series,symbol,label=self._solutiontype,picker=5)
+            plots[i].plot(data.index,series,symbol,label=self._code+' '+self._solutiontype,picker=5)
             if not havebase:
                 plots[i].set_ylabel(ylabel)
                 plots[i].tick_params(labelsize=8)
@@ -331,7 +331,7 @@ class Timeseries( object ):
             for i,d in zip(index,index.to_pydatetime()):
                 xyz1=d1.loc[i]
                 xyz2=other(d)
-                diffdata.append([xyz1.x-xyz2[0],xyz1.y-xyz2[2],xyz1.z-xyz2[2]])
+                diffdata.append([xyz1.x-xyz2[0],xyz1.y-xyz2[1],xyz1.z-xyz2[2]])
             data=pd.DataFrame(data=diffdata,index=index.copy(),columns=('x','y','z'))
         else:
             raise RuntimeError('Invalid value to subtract in Timeseries.subtract')
@@ -339,6 +339,23 @@ class Timeseries( object ):
         xyzenu=self._xyzenu if self._xyzenu is not None else self._xyz0
         return Timeseries(newcode,newtype,data=data,xyz0=xyz0,xyzenu=xyzenu)
 
+    def resample( self, rule, normalize=True, how=None ):
+        '''
+        Resamples the time series using pd.DataFrame.resample.  
+        
+        rule can be one of the pandas.tseries rules such as M (month), Y (year), or an integer
+        number, meaning a number of days
+
+        how by default is mean.  Good alternatives are 'median'
+        '''
+
+        loffset=None
+        if type(rule)==int:
+            ndays=rule
+            rule=pd.tseries.offsets.Day(ndays)
+            loffset=pd.tseries.offsets.Day(int(ndays/2))
+        d1=self.getData(enu=False, normalize=normalize).resample(rule,how=how,loffset=loffset)
+        return Timeseries(self._code,self._solutiontype,data=d1,xyz0=self._xyz0,xyzenu=self._xyzenu)
 
     class Comparison( object ):
 
@@ -739,7 +756,7 @@ class SqliteTimeseriesList( TimeseriesList ):
         db.close()
         return [types.solution_type[i] for i in types.index]
         
-    def stationCoordinates( self, date, solutiontype=None, selectday=False ):
+    def stationCoordinates( self, date, solutiontype=None, codes=None, selectday=False ):
         '''
         Return a DataFrame of stations and coordinates that apply at a specific
         epoch, or during a (UTC) day.
@@ -750,6 +767,7 @@ class SqliteTimeseriesList( TimeseriesList ):
             from mark_coordinate m
             where solution_type=?
             {when}
+            {codelist}
             order by code
             '''
         db=SqliteTimeseries._openDb( self._dbfile )
@@ -776,7 +794,11 @@ class SqliteTimeseriesList( TimeseriesList ):
         else:
             when='and epoch=?'
             params.append(date.strftime(dateformat))
+        codelist=''
+        if codes is not None:
+            codelist='and code in ('+(','.join(["'"+c+"'" for c in codes]))+')'
         sql=sql.replace('{when}',when)
+        sql=sql.replace('{codelist}',codelist)
         data=pd.read_sql(sql,db,params=params,index_col='code')
         db.close()
         return data
