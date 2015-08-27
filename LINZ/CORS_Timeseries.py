@@ -304,21 +304,37 @@ class Timeseries( object ):
 
     def subtract( self, other, newcode=None, newtype=None, normalize=False ):
         '''
-        Returns a time series subtracting other from the current series
+        Returns a time series subtracting other from the current series.  Other
+        can be another time series, or a function that takes a date as input
+        and returns an XYZ coordinate
 
         By default requires that both series have the same code.  Will
         return an error if not.  Over-ride by including a newcode parameter
         '''
-        if newcode is None:
-            if self._code != other._code:
-                raise RuntimeError('Cannot compare two series with different codes')
-            newcode=self._code
-        if newtype is None:
-            newtype=other._solutiontype+'-'+self._solutiontype
+
         d1=self.getData(enu=False, normalize=normalize)
-        d2=other.getData(enu=False, normalize=normalize)
-        join=d1.join(d2,rsuffix='2',how='inner')
-        data=pd.DataFrame(data={'x':join.x-join.x2,'y':join.y-join.y2,'z':join.z-join.z2})
+        if isinstance( other, Timeseries ):
+            if newcode is None:
+                if self._code != other._code:
+                    raise RuntimeError('Cannot compare two series with different codes')
+                newcode=self._code
+            if newtype is None:
+                newtype=other._solutiontype+'-'+self._solutiontype
+            d2=other.getData(enu=False, normalize=normalize)
+            join=d1.join(d2,rsuffix='2',how='inner')
+            data=pd.DataFrame(data={'x':join.x-join.x2,'y':join.y-join.y2,'z':join.z-join.z2})
+        elif callable(other):
+            newcode=newcode or self._code
+            newtype=newtype or self._solutiontype
+            index=d1.index
+            diffdata=[]
+            for i,d in zip(index,index.to_pydatetime()):
+                xyz1=d1.loc[i]
+                xyz2=other(d)
+                diffdata.append([xyz1.x-xyz2[0],xyz1.y-xyz2[2],xyz1.z-xyz2[2]])
+            data=pd.DataFrame(data=diffdata,index=index.copy(),columns=('x','y','z'))
+        else:
+            raise RuntimeError('Invalid value to subtract in Timeseries.subtract')
         xyz0=[0,0,0]
         xyzenu=self._xyzenu if self._xyzenu is not None else self._xyz0
         return Timeseries(newcode,newtype,data=data,xyz0=xyz0,xyzenu=xyzenu)
