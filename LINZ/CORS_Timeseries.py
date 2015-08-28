@@ -45,7 +45,8 @@ class Timeseries( object ):
                  xyzenu=None,
                  transform=None,
                  after=None,
-                 before=None
+                 before=None,
+                 normalize=False
                 ):
         '''
         Create a time series. Parameters are:
@@ -71,6 +72,7 @@ class Timeseries( object ):
         self._transform=transform
         self._before=None
         self._after=None
+        self._normalize=normalize
         self.setDateRange(after=after,before=before)
         if xyz is not None and dates is not None:
             data=pd.DataFrame(xyz,columns=('x','y','z'))
@@ -100,6 +102,9 @@ class Timeseries( object ):
 
         if self._before is not None:
             data=data[data.index < self._before]
+
+        if self._normalize:
+            date.set_index(date.index.normalize(),inplace=True)
 
         data.sort_index(inplace=True)
         xyz=np.vstack((data.x,data.y,data.z)).T
@@ -528,7 +533,7 @@ class FileTimeseries( Timeseries ):
     _epoch_col='epoch'
 
     @staticmethod
-    def seriesList( filepattern, solutiontype='default',after=None,before=None ):
+    def seriesList( filepattern, solutiontype='default',after=None,before=None,normalize=False ):
         '''
         Get the potential time series files, any file matching the filepattern.  The 
         pattern can include {code} in the filename to represent the code to use
@@ -547,12 +552,12 @@ class FileTimeseries( Timeseries ):
             if path:
                 fn=os.path.join(path,fn)
             code=match.group('code')
-            series.append(FileTimeseries(fn,code,solutiontype,after=after,before=before))
+            series.append(FileTimeseries(fn,code,solutiontype,after=after,before=before,normalize=normalize))
         return series
 
 
-    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None, after=None, before=None ):
-        Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after,before=before)
+    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None, after=None, before=None, normalize=False ):
+        Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after,before=before,normalize=normalize)
         self._filename=filename
 
     def _loadData( self ):
@@ -593,13 +598,13 @@ class FileTimeseries( Timeseries ):
 
 class TimeseriesList( list ):
 
-    def __init__( self, source=None, solutiontype=None, after=None, before=None ):
+    def __init__( self, source=None, solutiontype=None, after=None, before=None, normalize=False ):
         list.__init__(self)
         if source is not None:
             if os.path.isfile(source):
-                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before ))
+                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before, normalize=normalize ))
             else:
-                self.extend(FileTimeseries.seriesList(source,solutiontype, after=after, before=before))
+                self.extend(FileTimeseries.seriesList(source,solutiontype, after=after, before=before, normalize=normalize))
 
     def codes( self ):
         codes={}
@@ -740,12 +745,12 @@ class TimeseriesList( list ):
 
 class SqliteTimeseriesList( TimeseriesList ):
 
-    def __init__( self, source=None, solutiontype=None, after=None, before=None ):
+    def __init__( self, source=None, solutiontype=None, after=None, before=None, normalize=False ):
         if not os.path.isfile(source):
             raise RuntimeError("SqliteTimeseriesList source is not a file: "+str(source))
         self._dbfile=source
         self._solutiontype=solutiontype
-        TimeseriesList.__init__(self,source=source,solutiontype=solutiontype,after=after,before=before)
+        TimeseriesList.__init__(self,source=source,solutiontype=solutiontype,after=after,before=before, normalize=normalize)
 
     def solutionTypes( self ):
         _sqlTypes='''
