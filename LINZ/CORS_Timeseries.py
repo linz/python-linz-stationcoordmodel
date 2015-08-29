@@ -26,6 +26,7 @@ def robustStandardError(obs):
     robust estimator for the 95% cumulative probability (two tailed), so is scaled by 
     1.96 to get standard error.
     '''
+
     errors=[0]*3
     for axis in range(3):
         diffs=np.abs(obs[1:,axis]-obs[:-1,axis])
@@ -104,7 +105,7 @@ class Timeseries( object ):
             data=data[data.index < self._before]
 
         if self._normalize:
-            date.set_index(date.index.normalize(),inplace=True)
+            data.set_index(data.index.normalize(),inplace=True)
 
         data.sort_index(inplace=True)
         xyz=np.vstack((data.x,data.y,data.z)).T
@@ -189,7 +190,7 @@ class Timeseries( object ):
 
     def getObs( self, enu=True, detrend=True, index=None ):
         '''
-        Returns the time series as time and date arrays
+        Returns the time series as date and enu/xyz arrays
 
         Parameters:
             enu      Select the ENU data rather than XYZ (default True)
@@ -456,7 +457,7 @@ class SqliteTimeseries( Timeseries ):
         return db
 
     @staticmethod
-    def seriesList( dbfile, solutiontype=None,after=None,before=None ):
+    def seriesList( dbfile, solutiontype=None,after=None,before=None,normalize=False ):
         db=SqliteTimeseries._openDb( dbfile )
         seriescodes=pd.read_sql(SqliteTimeseries._sqlList, db )
         db.close()
@@ -464,11 +465,11 @@ class SqliteTimeseries( Timeseries ):
         for i in seriescodes.index:
             code,solntype=(seriescodes.code[i],seriescodes.solution_type[i])
             if solutiontype is None or solutiontype == solntype:
-                series.append(SqliteTimeseries(dbfile,code,solntype,after=after,before=before))
+                series.append(SqliteTimeseries(dbfile,code,solntype,after=after,before=before,normalize=normalize))
         return series
 
-    def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None, before=None ):
-        Timeseries.__init__( self, code, solutiontype=solutiontype, xyz0=xyz0, transform=transform, after=after, before=before )
+    def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None, before=None, normalize=False ):
+        Timeseries.__init__( self, code, solutiontype=solutiontype, xyz0=xyz0, transform=transform, after=after, before=before, normalize=normalize )
         self._dbfile=dbfile
 
     def _loadData( self ):
