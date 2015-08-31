@@ -14,10 +14,11 @@ import sqlite3
 import numpy as np
 import datetime as dt
 import pandas as pd
+from scipy import stats
 
 from LINZ.Geodetic.Ellipsoid import GRS80
 
-def robustStandardError(obs):
+def robustStandardError(obs,percentile=95.0):
     '''
     Estimate the standard error for components of a time series.
 
@@ -27,14 +28,15 @@ def robustStandardError(obs):
     1.96 to get standard error.
     '''
 
+    ppf=stats.norm.ppf((1.0+percentile/100.0)/2.0)
     errors=[0]*3
     for axis in range(3):
         diffs=np.abs(obs[1:,axis]-obs[:-1,axis])
         # Note sqrt(2) accounts for the fact that these are differences
         # between two observations
-        se=np.percentile(diffs,95.0)/(1.96*np.sqrt(2))
+        se=np.percentile(diffs,percentile)/(ppf*np.sqrt(2))
         errors[axis]=se
-    return errors
+    return np.array(errors)
 
 class Timeseries( object ):
 
@@ -131,10 +133,6 @@ class Timeseries( object ):
         self._xyz0=xyz0
         self._data=data
 
-        # Add instance version of class methods
-
-        self.robustStandardError=lambda: Timeseries.robustStandardError(self.getObs()[1])
-
     def setXyzTransform( self, xyz0=None, xyzenu=None, transform=None ):
         if xyz0 is not None and (
             self._xyz0 is None or
@@ -188,39 +186,44 @@ class Timeseries( object ):
         trends=[np.poly1d(pfit[:,i])(days) for i,c in enumerate(columns)]
         return pd.DataFrame(np.vstack(trends).T,index=self._data.index,columns=columns)
 
-    def getObs( self, enu=True, detrend=True, index=None ):
+    def getObs( self, enu=True, detrend=False, normalize=False, index=None ):
         '''
         Returns the time series as date and enu/xyz arrays
 
         Parameters:
-            enu      Select the ENU data rather than XYZ (default True)
-            index    Pandas data frame index to extract subset of data
+            enu         Select the ENU data rather than XYZ (default True)
+            detrend     Remove trend from observations
+            index       Pandas data frame index to extract subset of data
+            normalize   Normalize dates in time series
 
         Returns two values:
-            dates    An array of dates for the time series
+            dates    Andarray of dates for the time series
             enu      An numpy array of east,north,up values relative to the
                      model reference coordinate, or xyz coordinates if enu is False
         '''
         self._load()
-        data=self._data
-        if index:
-            data=data[index]
         cols=('e','n','u') if enu else ('x','y','z')
+        data=self.getData(enu=enu,detrend=detrend,normalize=normalize,index=index)
         return data.index.to_pydatetime(),np.vstack((data[x] for x in cols)).T
 
-    def getData( self, enu=True, index=None, normalize=False ):
+    def getData( self, enu=True, detrend=False, index=None, normalize=False ):
         ''' 
         Returns the time series as a pandas DataFrame. 
 
         Parameters:
-            enu      Select the ENU data rather than XYZ (default True)
-            index    Pandas data frame index to extract subset of data
+            enu         Select the ENU data rather than XYZ (default True)
+            detrend     Remove trend from observations
+            index       Pandas data frame index to extract subset of data
+            normalize   Normalize dates in time series
         '''
         self._load()
-        data=self._data
-        if index:
-            data=data[index]
-        result=data[['e','n','u']] if enu else data[['x','y','z']]
+        columns=['e','n','u'] if enu else ['x','y','z']
+        result=self._data[columns]
+        if detrend:
+            trend=self.trend(columns)
+            result -= trend
+        if index is not None:
+            result=result.loc[index]
         if normalize:
             result.set_index(result.index.normalize(),inplace=True)
         return result
@@ -363,6 +366,94 @@ class Timeseries( object ):
         d1=self.getData(enu=False, normalize=normalize).resample(rule,how=how,loffset=loffset)
         return Timeseries(self._code,self._solutiontype,data=d1,xyz0=self._xyz0,xyzenu=self._xyzenu)
 
+    def robustStandardError( self, percentile=95.0 ):
+        '''
+        Returns the "robust standard error" of the time series E,N,U components
+        as a numpy array. 
+        '''
+        return robustStandardError(self.getObs()[1],percentile)
+
+    def findOutliers( self, ndays=10, tolerance=5.0, percentile=95.0, goodrows=False ):
+        '''
+        Detect outliers in the time series and return either the indexes of outliers
+        (goodrows=False) or of the non-outliers (goodrows=True)
+
+        Based on the difference between the observated value and a local median of 
+        values within ndays of the value being tested.  Outliers are points with an
+        E,N, or U value more than tolerance times the robust standard error from the
+        median.  The robust standard error is calculated with a specific percentage.
+
+        Note: calculating the medians is slow!
+        '''
+        dates,obs=self.getObs()
+        rse=robustStandardError(obs,percentile)
+
+        testrange=dt.timedelta(days=ndays)
+        medians=np.array([
+            np.median(obs[np.logical_and(dates>=d-testrange,dates<=d+testrange)],axis=0)
+            for d in dates])
+        if goodrows:
+            rows=np.where(np.all(np.abs(obs-medians) <= rse*tolerance,axis=1))
+        else:
+            rows=np.where(np.any(np.abs(obs-medians) > rse*tolerance,axis=1))
+        return self.getData().index[rows]
+
+    def withoutOutliers( self, ndays=10, tolerance=5.0, percentile=95.0 ):
+        '''
+        Return a new version of the time series without the outliers
+        '''
+        index=self.findOutliers(ndays=ndays,tolerance=tolerance,percentile=percentile,goodrows=True)
+        data=self.getData(enu=False,index=index)
+        return Timeseries(
+            self._code,
+            data=data,
+            solutiontype=self._solutiontype,
+            xyz0=self._xyz0,
+            xyzenu=self._xyzenu,
+            transform=None
+            )
+        
+    def __init__( self, code, solutiontype='default', 
+                 data=None, 
+                 dates=None, xyz=None,
+                 xyz0=None, 
+                 xyzenu=None,
+                 transform=None,
+                 after=None,
+                 before=None,
+                 normalize=False
+                ):
+        '''
+        Create a time series. Parameters are:
+
+        code            the station code being loaded
+        solutiontype    a string identifying the solution type of the time series
+        data            a pandas data frame with columns indexed on date and with
+                        columns x, y, z
+        dates, xyz      Alternative format for loading, dates is an array of dates,
+                        xyz is a numpy array with shape (n,3)
+        xyz0            Reference xyz coordinate for calculated enu components
+        xyzenu          Reference xyz coordinate for calculated enu components
+        transform       A transformation function applied to the XYZ coordinates 
+        after           The earliest date of interest
+        before          The latest date of interest
+        '''
+
+        self._loaded=False
+        self._code=code
+        self._solutiontype=solutiontype
+        self._xyz0=xyz0
+        self._xyzenu=xyzenu
+        self._transform=transform
+        self._before=None
+        self._after=None
+        self._normalize=normalize
+        self.setDateRange(after=after,before=before)
+        if xyz is not None and dates is not None:
+            data=pd.DataFrame(xyz,columns=('x','y','z'))
+            data.set_index(pd.to_datetime(dates),inplace=True)
+        self._sourcedata=data
+
     class Comparison( object ):
 
         def __init__(self, ts1, ts2, newcode=None, newtype=None, normalize=False):
@@ -399,8 +490,8 @@ class Timeseries( object ):
             '''
             ts1=self.ts1
             ts2=self.ts2
-            rsets1=robustStandardError(ts1.getObs()[1])
-            rsets2=robustStandardError(ts2.getObs()[1])
+            rsets1=ts1.robustStandardError()
+            rsets2=ts2.robustStandardError()
             ts1=ts1.getData()-ts1.trend()
             ts2=ts2.getData()-ts2.trend()
             print(self.ts1_solution,"solution detrended stats")
@@ -712,7 +803,7 @@ class TimeseriesList( list ):
                 stype2=cmp.ts2.solutiontype()
                 row=[code]
                 for ts in (cmp.ts1,cmp.ts2):
-                    row.extend(robustStandardError(ts.getObs()[1]))
+                    row.extend(ts.robustStandardError())
                 diff=cmp.diff.getData()
                 stats=diff.describe()
                 stats2=np.abs(diff).describe()
