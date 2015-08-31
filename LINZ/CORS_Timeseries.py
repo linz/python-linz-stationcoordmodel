@@ -38,6 +38,32 @@ def robustStandardError(obs,percentile=95.0):
         errors[axis]=se
     return np.array(errors)
 
+def findOutliers( enu_data,  ndays=10, tolerance=5.0, percentile=95.0, goodrows=False ):
+    '''
+    Detect outliers in the time series and return either the indexes of outliers
+    (goodrows=False) or of the non-outliers (goodrows=True).  Assumes that enu_data
+    is a dataframe with columns e, n, u and a datetime index.
+
+    Based on the difference between the observated value and a local median of 
+    values within ndays of the value being tested.  Outliers are points with an
+    E,N, or U value more than tolerance times the robust standard error from the
+    median.  The robust standard error is calculated with a specific percentage.
+
+    Note: calculating the medians is slow!
+    '''
+    testrange=pd.DateOffset(days=ndays)
+    idx=enu_data.index
+    obs=np.vstack((enu_data.e,enu_data.n,enu_data.u)).T
+    rse=robustStandardError(obs,percentile)
+    medians=np.array([
+        np.median(obs[np.logical_and(idx>=d-testrange,idx<=d+testrange)],axis=0)
+        for d in idx])
+    if goodrows:
+        rows=np.where(np.all(np.abs(obs-medians) <= rse*tolerance,axis=1))
+    else:
+        rows=np.where(np.any(np.abs(obs-medians) > rse*tolerance,axis=1))
+    return idx[rows]
+
 class Timeseries( object ):
 
         
@@ -375,28 +401,9 @@ class Timeseries( object ):
 
     def findOutliers( self, ndays=10, tolerance=5.0, percentile=95.0, goodrows=False ):
         '''
-        Detect outliers in the time series and return either the indexes of outliers
-        (goodrows=False) or of the non-outliers (goodrows=True)
-
-        Based on the difference between the observated value and a local median of 
-        values within ndays of the value being tested.  Outliers are points with an
-        E,N, or U value more than tolerance times the robust standard error from the
-        median.  The robust standard error is calculated with a specific percentage.
-
-        Note: calculating the medians is slow!
+        Return index of outliers or good rows.
         '''
-        dates,obs=self.getObs()
-        rse=robustStandardError(obs,percentile)
-
-        testrange=dt.timedelta(days=ndays)
-        medians=np.array([
-            np.median(obs[np.logical_and(dates>=d-testrange,dates<=d+testrange)],axis=0)
-            for d in dates])
-        if goodrows:
-            rows=np.where(np.all(np.abs(obs-medians) <= rse*tolerance,axis=1))
-        else:
-            rows=np.where(np.any(np.abs(obs-medians) > rse*tolerance,axis=1))
-        return self.getData().index[rows]
+        return findOutliers(self.getData(),ndays=ndays,tolerance=tolerance,percentile=percentile,goodrows=goodrows)
 
     def withoutOutliers( self, ndays=10, tolerance=5.0, percentile=95.0 ):
         '''
