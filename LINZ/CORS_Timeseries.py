@@ -261,12 +261,13 @@ class Timeseries( object ):
         self._load()
         return self._data.index
 
-    def plot( self, detrend=False, samescale=False, symbol=None, baseplot=None, **kwds ):
+    def plot( self, detrend=False, independent=False, samescale=False, symbol=None, baseplot=None, **kwds ):
         '''
         Plot the time series onto 3 separate graphs
 
            detrend=True to remove the trend from the plots
            samescale=True to force the X,Y,Z axes to share the same scale
+           independent=True to calculate trends independently from the baseplot
            
            Additional keywords are passed to the pyplot.subplots function
            call.
@@ -318,7 +319,7 @@ class Timeseries( object ):
             ylabel=axis_labels[i]
             trendp=None
             days=None
-            if detrend and not havebase:
+            if detrend and (independent or not havebase):
                 days=mdates.date2num(data.index)
                 trendp=np.poly1d(np.polyfit(days,series,1))
                 baseplot['trends'][i]=trendp
@@ -351,10 +352,14 @@ class Timeseries( object ):
         if isinstance( other, Timeseries ):
             if newcode is None:
                 if self._code != other._code:
-                    raise RuntimeError('Cannot compare two series with different codes')
-                newcode=self._code
+                    newcode=other._code+'-'+self._code
+                else:
+                    newcode=self._code
             if newtype is None:
-                newtype=other._solutiontype+'-'+self._solutiontype
+                if self._solutiontype != other._solutiontype:
+                    newtype=other._solutiontype+'-'+self._solutiontype
+                else:
+                    newtype=self._solutiontype
             d2=other.getData(enu=False, normalize=normalize)
             join=d1.join(d2,rsuffix='2',how='inner')
             data=pd.DataFrame(data={'x':join.x-join.x2,'y':join.y-join.y2,'z':join.z-join.z2})
