@@ -415,6 +415,12 @@ class Timeseries( object ):
         Return a new version of the time series without the outliers
         '''
         index=self.findOutliers(ndays=ndays,tolerance=tolerance,percentile=percentile,goodrows=True)
+        return self.filteredByIndex(index)
+
+    def filteredByIndex( self, index ):
+        '''
+        Return a subset of the data filtered to a set of index values
+        '''
         data=self.getData(enu=False,index=index)
         return Timeseries(
             self._code,
