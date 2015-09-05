@@ -68,25 +68,14 @@ class GDB_Timeseries_Calculator( object ):
         '''
         return self.itrf
 
-    def getMarkData( self, code, dates=None, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
+    def getMarkData( self, code, index=None, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
         '''
         Get the time series for a geodetic mark.  Retrieves the official coordinates, calculates the
         deformation model at the required dates, and constructs a timeseries from them.
 
-        Can supply a list of dates, a from date, to date, and increment, or use the default dates.
+        Can supply a list of dates as an index, a from date, to date, and increment, or use the default dates.
         '''
-        if dates is None and toDate is not None:
-            dates=[]
-            date=fromDate
-            delta=timedelta( days=increment )
-            while date <= toDate:
-                dates.append(date)
-                date += delta
-        if dates is None:
-            dates=self._defaultDates
 
-        if dates is None:
-            raise RuntimeError('GDB timeseries dates are not defined')
         if self._deformationModelDirectory is None:
             raise RuntimeError('GDB timeseries deformation moel transformation is not defined')
         if self._itrfTransformation is None:
@@ -97,10 +86,12 @@ class GDB_Timeseries_Calculator( object ):
             raise RuntimeError('GDB timeseries for '+code+' not available - mark not in GDB')
         lon,lat,hgt=markdata.official_coordinate
         markxyz=GRS80.xyz(lon,lat,hgt)
-        markitrf=[GRS80.xyz(self._itrfTransformation(lon,lat,hgt,d)) for d in dates]
-        gdbts=CORS_Timeseries.Timeseries(code,solutiontype='gdb',dates=dates,xyz=markitrf,xyz0=xyz0)
+        function=lambda d: GRS80.xyz(self._itrfTransformation(lon,lat,hgt,d))
+        gdbts=CORS_Timeseries.FunctionTimeseries(function,code=code,solutiontype='gdb',index=index,after=fromDate,before=toDate,xyz0=markxyz)
         return GDB_Timeseries_Calculator.StationData(code,markxyz,markdata,gdbts)
 
-    def get( self, code, dates=None, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
-        data=self.getMarkData(code,dates=dates,fromDate=fromDate,toDate=toDate,increment=increment,xyz0=xyz0)
+    def get( self, code, index=None, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
+        data=self.getMarkData(code,index=index,fromDate=fromDate,toDate=toDate,increment=increment,xyz0=xyz0)
         return data.timeseries
+
+

@@ -94,6 +94,7 @@ class Timeseries( object ):
         '''
 
         self._loaded=False
+        self._isfunction=False
         self._code=code
         self._solutiontype=solutiontype
         self._xyz0=xyz0
@@ -277,6 +278,7 @@ class Timeseries( object ):
         import matplotlib.dates as mdates
 
         default_symbols=['b+','r+','g+','m+']
+        default_lines=['b-','r-','g-','m-']
         axis_labels=('East','North','Up')
 
         havebase=True
@@ -305,14 +307,20 @@ class Timeseries( object ):
         plots=baseplot['plots']
 
         if symbol is None:
-            for s in default_symbols:
-                if s not in baseplot['symbols']:
+            defaults=default_lines if self._isfunction else default_symbols
+            colours=[s[:1] for s in baseplot['symbols']]
+            possible=None
+            for s in defaults:
+                if s[:1] not in colours:
                     symbol=s
                     baseplot['symbols'].append(s)
                     break
+                if s not in baseplot['symbols']:
+                    possible=s
             if symbol is None:
-                symbol=default_symbols[0]
-
+                symbol=possible
+            if symbol is None:
+                symbol=defaults[0]
             
         for i,axis in enumerate(('e','n','u')):
             series=data[axis]
@@ -415,13 +423,40 @@ class Timeseries( object ):
         Return a new version of the time series without the outliers
         '''
         index=self.findOutliers(ndays=ndays,tolerance=tolerance,percentile=percentile,goodrows=True)
-        return self.filteredByIndex(index)
+        return self.filtered(index=index)
 
-    def filteredByIndex( self, index ):
+    def filtered( self, index=None, before=None, after=None ):
         '''
         Return a subset of the data filtered to a set of index values
         '''
-        data=self.getData(enu=False,index=index)
+        data=self.getData(enu=False)
+        filter=data.index.copy()
+        if index is not None:
+            filter=filter.intersection(index)
+        if before is not None:
+            filter=filter[filter <= before]
+        if after is not None:
+            filter=filter[filter >= after]
+        data=data.loc[filter]
+        return self.usingData(data)
+
+    def offsetBy( self, offset ):
+        '''
+        Shift time series by a subtracting offset specified as a time indexed
+        data frame of x, y, z values.  Only common times are included in the 
+        final data.
+        '''
+        data=self.getData(enu=False)
+        diff=data-offset
+        diff=diff[np.isfinite(diff.x)]
+        return self.usingData(diff)
+
+    def usingData( self, data ):
+        '''
+        Returns a copy of the current time series but using data 
+        specified.  Keeps code, solutiontype, xyz0, xyzenu.  
+        Discards transform.
+        '''
         return Timeseries(
             self._code,
             data=data,
@@ -430,6 +465,8 @@ class Timeseries( object ):
             xyzenu=self._xyzenu,
             transform=None
             )
+
+
         
     def __init__( self, code, solutiontype='default', 
                  data=None, 
@@ -705,6 +742,51 @@ class FileTimeseries( Timeseries ):
 
     def filename( self ):
         return self._filename
+
+
+class FunctionTimeseries( Timeseries ):
+
+    '''
+    Creates a CORS timeseries based on a function. The function must take a date
+    as an input and return an XYZ coordinate.
+    '''
+
+    def __init__( self, function, code='Function', solutiontype='function', xyz0=None, transform=None, after=None, before=None, increment=1,index=None, fillDays=False ):
+        '''
+        Calculates a time series either each day from after to before, or for the days specified by index.
+        '''
+        Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after,before=before)
+        if not callable(function):
+            raise RuntimeError('FunctionTimeseries needs a callable function')
+        self._function=function
+        self._isfunction=True
+        self.setDates( after=after, before=before, index=index, fillDays=fillDays )
+        
+    def setDates( self, after=None, before=None, increment=1, index=None, fillDays=False ):
+        if index is not None and fillDays:
+            after=index[0]
+            before=index[-1]
+            index=None
+        if index is None:
+            if after is None:
+                dtfrom=dt.date(2000,1,1)
+            else:
+                dtfrom=dt.date(after.year,after.month,after.day)
+            if before is None:
+                dtto=dt.date.today()
+            else:
+                dtto=dt.date(before.year,before.month,before.day)
+            incdef=str(int(increment))+'D'
+            index=pd.DatetimeIndex(start=dtfrom,end=dtto,freq=incdef)
+        self._index=index
+        self._loaded=False
+
+    def _loadData( self ):
+        index=self._index
+        function=self._function
+        xyzdata=[function(d) for d in index.to_pydatetime()]
+        data=pd.DataFrame(data=xyzdata,index=index.copy(),columns=('x','y','z'))
+        return data
 
 class TimeseriesList( list ):
 
