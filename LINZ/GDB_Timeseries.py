@@ -68,7 +68,7 @@ class GDB_Timeseries_Calculator( object ):
         '''
         return self.itrf
 
-    def getMarkData( self, code, index=None, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
+    def getMarkData( self, code, index=None, fillDays=False, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
         '''
         Get the time series for a geodetic mark.  Retrieves the official coordinates, calculates the
         deformation model at the required dates, and constructs a timeseries from them.
@@ -87,11 +87,11 @@ class GDB_Timeseries_Calculator( object ):
         lon,lat,hgt=markdata.official_coordinate
         markxyz=GRS80.xyz(lon,lat,hgt)
         function=lambda d: GRS80.xyz(self._itrfTransformation(lon,lat,hgt,d))
-        gdbts=CORS_Timeseries.FunctionTimeseries(function,code=code,solutiontype='gdb',index=index,after=fromDate,before=toDate,xyz0=markxyz)
+        gdbts=CORS_Timeseries.FunctionTimeseries(function,code=code,solutiontype='gdb',index=index,fillDays=fillDays,after=fromDate,before=toDate,xyz0=markxyz)
         return GDB_Timeseries_Calculator.StationData(code,markxyz,markdata,gdbts)
 
-    def get( self, code, index=None, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
-        data=self.getMarkData(code,index=index,fromDate=fromDate,toDate=toDate,increment=increment,xyz0=xyz0)
+    def get( self, code, index=None, fillDays=False, fromDate=datetime(2000,1,1), toDate=None, increment=1.0,xyz0=None ):
+        data=self.getMarkData(code,index=index,fillDays=fillDays,fromDate=fromDate,toDate=toDate,increment=increment,xyz0=xyz0)
         return data.timeseries
 
 

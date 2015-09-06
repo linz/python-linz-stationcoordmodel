@@ -467,48 +467,6 @@ class Timeseries( object ):
             )
 
 
-        
-    def __init__( self, code, solutiontype='default', 
-                 data=None, 
-                 dates=None, xyz=None,
-                 xyz0=None, 
-                 xyzenu=None,
-                 transform=None,
-                 after=None,
-                 before=None,
-                 normalize=False
-                ):
-        '''
-        Create a time series. Parameters are:
-
-        code            the station code being loaded
-        solutiontype    a string identifying the solution type of the time series
-        data            a pandas data frame with columns indexed on date and with
-                        columns x, y, z
-        dates, xyz      Alternative format for loading, dates is an array of dates,
-                        xyz is a numpy array with shape (n,3)
-        xyz0            Reference xyz coordinate for calculated enu components
-        xyzenu          Reference xyz coordinate for calculated enu components
-        transform       A transformation function applied to the XYZ coordinates 
-        after           The earliest date of interest
-        before          The latest date of interest
-        '''
-
-        self._loaded=False
-        self._code=code
-        self._solutiontype=solutiontype
-        self._xyz0=xyz0
-        self._xyzenu=xyzenu
-        self._transform=transform
-        self._before=None
-        self._after=None
-        self._normalize=normalize
-        self.setDateRange(after=after,before=before)
-        if xyz is not None and dates is not None:
-            data=pd.DataFrame(xyz,columns=('x','y','z'))
-            data.set_index(pd.to_datetime(dates),inplace=True)
-        self._sourcedata=data
-
     class Comparison( object ):
 
         def __init__(self, ts1, ts2, newcode=None, newtype=None, normalize=False):
