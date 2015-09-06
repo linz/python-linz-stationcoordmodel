@@ -262,13 +262,17 @@ class Timeseries( object ):
         self._load()
         return self._data.index
 
-    def plot( self, detrend=False, independent=False, samescale=False, symbol=None, baseplot=None, **kwds ):
+    def plot( self, detrend=False, independent=False, samescale=False, mmunits=False, symbol=None, baseplot=None, figtitle=True, **kwds ):
         '''
         Plot the time series onto 3 separate graphs
 
            detrend=True to remove the trend from the plots
            samescale=True to force the X,Y,Z axes to share the same scale
            independent=True to calculate trends independently from the baseplot
+           mmunits=True to use millimetres for units rather than metres
+           symbol='' to plot using a specified symbol
+           figtitle to specify the figure title (None or False for no title)
+           baseplot to plot againt a specified baseplot
            
            Additional keywords are passed to the pyplot.subplots function
            call.
@@ -292,9 +296,14 @@ class Timeseries( object ):
             settings={'sharex':True,'sharey':samescale,'figsize':(8,6),'dpi':100}
             settings.update(kwds)
             fig, plots=plt.subplots(3,1,**settings)
-            fig.suptitle(title)
+            if isinstance(figtitle,basestring):
+                title=figtitle
+            if figtitle is not None and figtitle is not False:
+                fig.suptitle(title)
+            baseplot['figure']=fig
             baseplot['plots']=plots
             baseplot['trends']=[None,None,None]
+            baseplot['mmunits']=mmunits
             baseplot['symbols']=[]
         else:
             self.setXyzTransform(xyz0=baseplot['xyz0'],xyzenu=baseplot['xyzenu'])
@@ -337,7 +346,9 @@ class Timeseries( object ):
                 if days is None:
                     days=mdates.date2num(data.index)
                 trend=trendp(days)
-                series=(series-trend)*1000
+                series=(series-trend)
+            if baseplot['mmunits']:
+                series=series*1000
                 ylabel=ylabel+' mm'
             plots[i].plot(data.index,series,symbol,label=self._code+' '+self._solutiontype,picker=5)
             if not havebase:
@@ -457,7 +468,7 @@ class Timeseries( object ):
         specified.  Keeps code, solutiontype, xyz0, xyzenu.  
         Discards transform.
         '''
-        return Timeseries(
+        result=Timeseries(
             self._code,
             data=data,
             solutiontype=self._solutiontype,
@@ -465,6 +476,8 @@ class Timeseries( object ):
             xyzenu=self._xyzenu,
             transform=None
             )
+        result._isfunction = self._isfunction
+        return result
 
 
     class Comparison( object ):
