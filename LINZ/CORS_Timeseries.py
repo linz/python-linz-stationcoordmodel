@@ -262,7 +262,7 @@ class Timeseries( object ):
         self._load()
         return self._data.index
 
-    def plot( self, detrend=False, independent=False, samescale=False, mmunits=False, symbol=None, baseplot=None, figtitle=True, **kwds ):
+    def plot( self, detrend=False, enu=True, independent=False, samescale=False, mmunits=False, symbol=None, baseplot=None, figtitle=True, **kwds ):
         '''
         Plot the time series onto 3 separate graphs
 
@@ -283,7 +283,6 @@ class Timeseries( object ):
 
         default_symbols=['b+','r+','g+','m+']
         default_lines=['b-','r-','g-','m-']
-        axis_labels=('East','North','Up')
 
         havebase=True
         if baseplot is None:
@@ -304,9 +303,19 @@ class Timeseries( object ):
             baseplot['plots']=plots
             baseplot['trends']=[None,None,None]
             baseplot['mmunits']=mmunits
+            baseplot['enu']=enu
             baseplot['symbols']=[]
         else:
+            enu=baseplot['enu']
+            mmunits=baseplot['mmunits']
             self.setXyzTransform(xyz0=baseplot['xyz0'],xyzenu=baseplot['xyzenu'])
+
+        if enu:
+            axis_labels=('East','North','Up')
+            columns=('e','n','u')
+        else:
+            axis_labels=('X','Y','Z')
+            columns=('x','y','z')
 
         self._load()
         data=self._data
@@ -331,7 +340,7 @@ class Timeseries( object ):
             if symbol is None:
                 symbol=defaults[0]
             
-        for i,axis in enumerate(('e','n','u')):
+        for i,axis in enumerate(columns):
             series=data[axis]
             ylabel=axis_labels[i]
             trendp=None
@@ -347,7 +356,7 @@ class Timeseries( object ):
                     days=mdates.date2num(data.index)
                 trend=trendp(days)
                 series=(series-trend)
-            if baseplot['mmunits']:
+            if mmunits:
                 series=series*1000
                 ylabel=ylabel+' mm'
             plots[i].plot(data.index,series,symbol,label=self._code+' '+self._solutiontype,picker=5)
@@ -453,12 +462,15 @@ class Timeseries( object ):
 
     def offsetBy( self, offset ):
         '''
-        Shift time series by a subtracting offset specified as a time indexed
-        data frame of x, y, z values.  Only common times are included in the 
-        final data.
+        Returns a new Timeseries created by adding an offset to the 
+        time series.
+        
+        The offset can be an [x,y,z] vector, or a time indexed
+        data frame of x, y, z values.  In the latter case common times 
+        are included in the final data.
         '''
         data=self.getData(enu=False)
-        diff=data-offset
+        diff=data+offset
         diff=diff[np.isfinite(diff.x)]
         return self.usingData(diff)
 
