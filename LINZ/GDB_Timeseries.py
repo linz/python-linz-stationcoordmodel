@@ -28,24 +28,26 @@ class GDB_Timeseries_Calculator( object ):
 
     StationData=namedtuple('StationData','code xyz markdata timeseries')
 
-    def __init__( self, deformationModelDirectory, itrf='ITRF2008', defaultDates=None ):
+    def __init__( self, deformationModelDirectory, itrf='ITRF2008', defaultDates=None, version=None ):
         '''
         Initiallize the time series calculator with the deformation model (defined
         by the directory in which it is located).  Defines the ITRF to calculate for
         (default ITRF2008) and the default dates for calculating the time series.
         '''
         self._deformationModelDirectory=deformationModelDirectory
-        self._deformationModelVersion=None
+        self._deformationModelVersion=version
         self.itrf=itrf
         self._defaultDates=None
         self._itrfTransformation=None
         self.loadDeformationModel()
 
-    def loadDeformationModel(self, deformationModelDirectory=None):
+    def loadDeformationModel(self, deformationModelDirectory=None,version=None):
         if deformationModelDirectory is not None:
             self._deformationModelDirectory=deformationModelDirectory
+        if version is not None:
+            self._deformationModelVersion=version
         if self._deformationModelDirectory is not None:
-            mod = DeformationModel(self._deformationModelDirectory)
+            mod = DeformationModel(self._deformationModelDirectory,version=self._deformationModelVersion)
             self._deformationModelVersion=mod.version()
             self.setupItrf()
 
@@ -54,7 +56,9 @@ class GDB_Timeseries_Calculator( object ):
             self.itrf=itrf
         if self._deformationModelDirectory is not None:
             self._itrfTransformation=ITRF_Transformation( 
-                modeldir=self._deformationModelDirectory, toNZGD2000=False, itrf=self.itrf)
+                modeldir=self._deformationModelDirectory, 
+                version=self._deformationModelVersion,
+                toNZGD2000=False, itrf=self.itrf)
 
     def deformationModelVersion( self ):
         '''
