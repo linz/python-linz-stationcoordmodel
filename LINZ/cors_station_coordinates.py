@@ -133,19 +133,19 @@ def main():
                 for transformation, isgeodetic in conversions:
                     try:
                         xyz=transformation(xyz_2008,calcdate)
-                     if isgeodetic:
-                        llh=GRS80.geodetic(xyz)
-                        row.extend([
-                            '{0:.9f}'.format(llh[0]),
-                            '{0:.9f}'.format(llh[1]),
-                            '{0:.4f}'.format(llh[2])
-                            ]);
-                     else:
-                        row.extend([
-                            '{0:.4f}'.format(xyz[0]),
-                            '{0:.4f}'.format(xyz[1]),
-                            '{0:.4f}'.format(xyz[2])
-                            ]);
+                        if isgeodetic:
+                            llh=GRS80.geodetic(xyz)
+                            row.extend([
+                                '{0:.9f}'.format(llh[0]),
+                                '{0:.9f}'.format(llh[1]),
+                                '{0:.4f}'.format(llh[2])
+                                ]);
+                        else:
+                            row.extend([
+                                '{0:.4f}'.format(xyz[0]),
+                                '{0:.4f}'.format(xyz[1]),
+                                '{0:.4f}'.format(xyz[2])
+                                ]);
                     except OutOfRangeError:
                         row.extend(['','',''])
                 writer.writerow(row)
