@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.17.1-1) trusty; urgency=medium
+
+  * Syntax error from file merge
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 23 Nov 2015 12:52:29 +1300
+
 python-linz-stationcoordmodel (1.17.0-1) trusty; urgency=medium
 
   * Adding normalize to time series lists
