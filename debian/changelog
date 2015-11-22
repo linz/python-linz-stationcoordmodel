@@ -1,3 +1,20 @@
+python-linz-stationcoordmodel (1.17.0-1) trusty; urgency=medium
+
+  * Adding normalize to time series lists
+  * Fixing normalizing series list
+  * Option to remove outliers
+  * Improving performance of findOutliers
+  * Improving differencing etc
+  * Adding filteredByIndex to timeseries
+  * GDB time series working
+  * Fixing GDB time series
+  * Adding plotting options
+  * Option for plotting XYZ
+  * Adding facility for selecting deformation model version (Note: need to tidy up def model loading)
+  * Adding cors_station_coordinates script
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 23 Nov 2015 12:48:21 +1300
+
 python-linz-stationcoordmodel (1.16.0-1) trusty; urgency=medium
 
   * Plot tidying and adding resample function
