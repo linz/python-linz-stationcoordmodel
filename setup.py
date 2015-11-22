@@ -102,7 +102,7 @@ setup(
             'spm_editor=LINZ.spm_editor:main',
             'analyse_cors=LINZ.CORS_Analyst:main',
             'report_datum_status=LINZ.report_datum_status:main',
-            'cors_station_coordinates=LINZ.cors_stations_coordinates:main',
+            'cors_station_coordinates=LINZ.cors_station_coordinates:main',
         ],
     },
 )
