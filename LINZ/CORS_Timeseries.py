@@ -776,10 +776,10 @@ class TimeseriesList( list ):
     def __init__( self, source=None, solutiontype=None, after=None, before=None, normalize=False ):
         list.__init__(self)
         if source is not None:
-            if os.path.isfile(source):
-                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before, normalize=normalize ))
-            else:
+            if '{code}' in source:
                 self.extend(FileTimeseries.seriesList(source,solutiontype, after=after, before=before, normalize=normalize))
+            else:
+                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before, normalize=normalize ))
 
     def codes( self ):
         codes={}
