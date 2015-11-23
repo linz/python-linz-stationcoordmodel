@@ -28,13 +28,22 @@ def main():
     Available coordinate systems are NZGD2000, ITRFxxxx.  These are geographic coordinates.
     For geocentric coordinates add _XYZ.  Multiple coordinate systems can be entered, eg
     ITRF20008+NZGD2000
+
+    The epoch can be formatted as YYYY-MM-DD or now-#### for #### days before now.
+    A range of dates can be selected as date1:date2
+    Appended to this can be criteria :W# to select a day of the week (0-6, 0=Monday) or
+    :M# for the day of month.
+    
+
+    The output CSV file can contain strings {yyyy} {mm} and {dd} that are replaced 
+    the year, month and day.
     '''
     parser=argparse.ArgumentParser(
                                    description="Export cors station coordinates from time series database",
                                    epilog=epilog,
                                    parents=[deformationModelArguments()])
     parser.add_argument('timeseries_data',help="Data source for CORS timeseries coordinates")
-    parser.add_argument('epoch',help="Epoch at which coordinates are required YYYY-MM-DD")
+    parser.add_argument('epoch',help="Epoch or range at which coordinates are required")
     parser.add_argument('output_csv_file',help="File to write coordinates to")
     parser.add_argument('-c','--coordinate-systems',help="Coordinate systems to output (default NZGD2000)")
     parser.add_argument('-s','--stations',help="Specifies stations to export, separated by +, or @filename")
@@ -46,18 +55,51 @@ def main():
 
     cors_itrf='ITRF2008'
     tslist=None
+    outputfiles={}
     try:
+        tslist=TimeseriesList(args.timeseries_data,solutiontype=args.solution_type,normalize=True)
+
         try:
-            tslist=TimeseriesList(args.timeseries_data,solutiontype=args.solution_type,normalize=True)
-        except RuntimeError as e:
-            raise RuntimeError(
-                "Invalid calculation epoch - must be YYYY-MM-DD:"+args.timeseries_data+
-                "\n"+e.message)
-        try:
-            calcdate=dt.datetime.strptime(args.epoch,'%Y-%m-%d')
-            epoch=calcdate.strftime('%Y-%m-%d')
+            parts=args.epoch.split(':')
+            if len(parts) < 2:
+                parts.append(parts[0])
+            startenddate=[]
+            for p in parts[:2]:
+                match=re.match(r'^now-(\d+)$',p,re.I)
+                if match:
+                    dtp=dt.date.today()-dt.timedelta(days=int(match.group(1)))
+                    startenddate.append(dt.datetime.combine(dtp,dt.time(0,0,0)))
+                else:
+                    startenddate.append(dt.datetime.strptime(args.epoch,'%Y-%m-%d'))
+            useday = lambda d: True
+            if len(parts) > 2:
+                match=re.match(r'^([MW])(\d\d?)$',parts[2].upper())
+                if not match:
+                    raise RuntimeError('Invalid epoch date selector '+parts[2])
+                dayno=int(match.group(2))
+                if match.group(1) == 'M':
+                    useday=lambda d: d.day == dayno
+                else:
+                    useday=lambda d: d.weekday() == dayno
+            startdate, enddate = startenddate
+            increment=dt.timedelta( days=1 )
+            while startdate <= enddate:
+                calcdate=startdate
+                startdate=startdate+increment
+                if not useday(calcdate):
+                    continue
+                filename=args.output_csv_file
+                filename=filename.replace('{yyyy}',"{0:04d}".format(calcdate.year))
+                filename=filename.replace('{mm}',"{0:02d}".format(calcdate.month))
+                filename=filename.replace('{dd}',"{0:02d}".format(calcdate.day))
+                filename=filename.replace('{ddd}',"{0:03d}".format(calcdate.timetuple().tm_yday))
+                if filename not in outputfiles:
+                    outputfiles[filename]=[]
+                outputfiles[filename].append(calcdate)
         except:
-            raise ValueError("Invalid calculation epoch - must be YYYY-MM-DD:"+args.epoch)
+            raise RuntimeError("Invalid calculation epoch - must be YYYY-MM-DD:"+args.epoch)
+        if len(outputfiles) == 0:
+            raise RuntimeError("No dates defined for station coordinates")
 
         defmodel=None
         conversions=[]
@@ -111,44 +153,47 @@ def main():
                                 (xyz[2]-nzxyz[2])**2) 
                                 < nzdist)
 
-        with open(args.output_csv_file,'wb') as csvf:
-            writer=csv.writer(csvf)
-            header='code epoch'.split()
-            header.extend(coord_cols)
-            writer.writerow(header)
-            for code in tslist.codes():
-                if not check_code(code):
-                    continue
-                ts=tslist.get(code).getData(enu=False)
-                try:
-                    crd=ts.ix[calcdate]
-                except KeyError:
-                    continue
+        for output_csv_file in sorted(outputfiles):
+            calcdates=outputfiles[output_csv_file]
+            with open(output_csv_file,'wb') as csvf:
+                writer=csv.writer(csvf)
+                header='code epoch'.split()
+                header.extend(coord_cols)
+                writer.writerow(header)
+                for code in tslist.codes():
+                    if not check_code(code):
+                        continue
+                    for calcdate in calcdates:
+                        ts=tslist.get(code).getData(enu=False)
+                        try:
+                            crd=ts.ix[calcdate]
+                        except KeyError:
+                            continue
 
-                xyz_2008=[crd.x,crd.y,crd.z]
-                if not check_xyz(xyz_2008):
-                    continue
+                        xyz_2008=[crd.x,crd.y,crd.z]
+                        if not check_xyz(xyz_2008):
+                            continue
 
-                row=[code,epoch]
-                for transformation, isgeodetic in conversions:
-                    try:
-                        xyz=transformation(xyz_2008,calcdate)
-                        if isgeodetic:
-                            llh=GRS80.geodetic(xyz)
-                            row.extend([
-                                '{0:.9f}'.format(llh[0]),
-                                '{0:.9f}'.format(llh[1]),
-                                '{0:.4f}'.format(llh[2])
-                                ]);
-                        else:
-                            row.extend([
-                                '{0:.4f}'.format(xyz[0]),
-                                '{0:.4f}'.format(xyz[1]),
-                                '{0:.4f}'.format(xyz[2])
-                                ]);
-                    except OutOfRangeError:
-                        row.extend(['','',''])
-                writer.writerow(row)
+                        row=[code,calcdate.strftime('%Y-%m-%d')]
+                        for transformation, isgeodetic in conversions:
+                            try:
+                                xyz=transformation(xyz_2008,calcdate)
+                                if isgeodetic:
+                                    llh=GRS80.geodetic(xyz)
+                                    row.extend([
+                                        '{0:.9f}'.format(llh[0]),
+                                        '{0:.9f}'.format(llh[1]),
+                                        '{0:.4f}'.format(llh[2])
+                                        ]);
+                                else:
+                                    row.extend([
+                                        '{0:.4f}'.format(xyz[0]),
+                                        '{0:.4f}'.format(xyz[1]),
+                                        '{0:.4f}'.format(xyz[2])
+                                        ]);
+                            except OutOfRangeError:
+                                row.extend(['','',''])
+                        writer.writerow(row)
 
     except RuntimeError as e:
         print(e.message)
