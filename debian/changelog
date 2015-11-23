@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.18.0-1) trusty; urgency=medium
+
+  * Adding more general epoch options
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 23 Nov 2015 14:12:28 +1300
+
 python-linz-stationcoordmodel (1.17.2-1) trusty; urgency=medium
 
   * Fixing entry point
