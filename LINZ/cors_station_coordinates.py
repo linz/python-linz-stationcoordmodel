@@ -101,7 +101,7 @@ def main():
         if len(outputfiles) == 0:
             raise RuntimeError("No dates defined for station coordinates")
 
-        defmodel=None
+        itrf_nzgd2000=None
         conversions=[]
         geodetic_suffix='_lon _lat _ehgt'.split()
         xyz_suffix='_X _Y _Z'.split()
@@ -115,9 +115,10 @@ def main():
             csbase=match.group(1)
             isgeodetic=match.group(2) != '_XYZ'
             transformation=None
-            if csbase == 'NZGD2000' and not defmodel:
-                defmodel=loadDeformationModel(args)
-                itrf_nzgd2000=ITRF_NZGD2000.Transformation(itrf=cors_itrf,model=defmodel)
+            if csbase == 'NZGD2000':
+                if not itrf_nzgd2000:
+                    defmodel=loadDeformationModel(args)
+                    itrf_nzgd2000=ITRF_NZGD2000.Transformation(itrf=cors_itrf,model=defmodel)
                 def transformation(xyz,date):
                     llh=GRS80.geodetic(xyz)
                     llh2k=itrf_nzgd2000.transform(llh[0],llh[1],llh[2],date)
