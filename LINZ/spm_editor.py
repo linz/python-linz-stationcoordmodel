@@ -262,6 +262,7 @@ class NavigationToolbar( NavigationToolbar2QTAgg ):
                 c.toggled.connect(self.clearPicker)
                 next=None
 
+        #
         pm=QPixmap(32,32)
         pm.fill(QApplication.palette().color(QPalette.Normal,QPalette.Button))
         painter=QPainter(pm)
@@ -278,6 +279,37 @@ class NavigationToolbar( NavigationToolbar2QTAgg ):
         self.picker = picker
         button=QToolButton(self)
         button.setDefaultAction(self.picker)
+        self.insertWidget(next.defaultAction(),button)
+        #
+        pm=QPixmap(32,32)
+        pm.fill(QApplication.palette().color(QPalette.Normal,QPalette.Button))
+        painter=QPainter(pm)
+        painter.fillRect(6,6,20,20,Qt.green)
+        painter.fillRect(15,3,3,26,Qt.blue)
+        painter.fillRect(3,15,26,3,Qt.blue)
+        painter.end()
+        icon=QIcon(pm)
+        picker=QAction("UnrejectObs",self)
+        picker.setIcon(icon)
+        picker.setToolTip("Use all observations")
+        self.unrejectObs = picker
+        button=QToolButton(self)
+        button.setDefaultAction(self.unrejectObs)
+        self.insertWidget(next.defaultAction(),button)
+        #
+        pm=QPixmap(32,32)
+        pm.fill(QApplication.palette().color(QPalette.Normal,QPalette.Button))
+        painter=QPainter(pm)
+        painter.fillRect(6,6,20,20,Qt.red)
+        painter.fillRect(12,12,8,8,Qt.blue)
+        painter.end()
+        icon=QIcon(pm)
+        picker=QAction("AutoRejectObs",self)
+        picker.setIcon(icon)
+        picker.setToolTip("Auto reject observations")
+        self.autoRejectObs = picker
+        button=QToolButton(self)
+        button.setDefaultAction(self.autoRejectObs)
         self.insertWidget(next.defaultAction(),button)
     
     def clearPicker( self, checked ):
@@ -724,6 +756,16 @@ class AppForm(QMainWindow):
             self.model.setUseObs( event.ind[0], toggle=True )
             self.replotUsed()
 
+    def unrejectObsClicked( self ):
+        if self.model:
+            self.model.clearExcludedObs()
+            self.replotUsed()
+
+    def autoRejectObsClicked( self ):
+        if self.model:
+            self.model.autoRejectObs()
+            self.replotUsed()
+
     def addComponent( self ):
         ctype = self.addComponentType.itemData(self.addComponentType.currentIndex()).toPyObject()
         cdate = self.addComponentDate.dateTime().toPyDateTime()
@@ -763,6 +805,8 @@ class AppForm(QMainWindow):
         # Create the navigation toolbar, tied to the canvas
         #
         self.toolbar = NavigationToolbar(self.canvas, self.main_frame)
+        self.toolbar.unrejectObs.triggered.connect(self.unrejectObsClicked)
+        self.toolbar.autoRejectObs.triggered.connect(self.autoRejectObsClicked)
         
         # Other GUI controls
 

@@ -876,6 +876,7 @@ class Model( object ):
         self.versiondate = datetime.now()
         self.setStation(station,xyz)
         self.filename=None
+        self.timeseries=None
         self.dates=None
         self.obs=None
         self.useobs=None
@@ -1215,6 +1216,10 @@ class Model( object ):
             self.excluded.append(exclude_obs(date,comment,index=index))
             self.excluded.sort( key=lambda x: x.day )
 
+    def clearExcludedObs( self ):
+        for index in [e.index for e in self.excluded]:
+            self.setUseObs(index)
+
     def setExcludedObs( self ):
         '''
         Used to initially link the excluded obs list to the time series data
@@ -1229,6 +1234,14 @@ class Model( object ):
                         e.index=i
                         self.useobs[i]=False
                         break
+
+    def autoRejectObs( self, ndays=10, tolerance=5.0, percentile=95.0 ):
+        if self.timeseries:
+            outliers=self.timeseries.findOutliers( ndays=ndays, tolerance=tolerance, percentile=percentile )
+            for date in self.timeseries.findOutliers().to_pydatetime():
+                match=np.where(self.dates==date)[0]
+                if len(match) > 0:
+                    self.setUseObs( match[0], comment='Auto rejected', use=False)
 
     def loadTimeSeries( self, timeseries, transform=None ):
         '''
@@ -1247,6 +1260,7 @@ class Model( object ):
             timeseries=FileTimeseries(filename,code=self.station)
         
         timeseries.setXyzTransform(self.xyz)
+        self.timeseries=timeseries
         self.dates,self.enu=timeseries.getObs()
         self.station=timeseries.code()
         self.xyz=timeseries.xyz0()

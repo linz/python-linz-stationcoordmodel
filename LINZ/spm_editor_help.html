@@ -1,0 +1,192 @@
+<html>
+    <head><title>Station prediction model editor</title></head>
+    <body>
+        <h1>Installation</h1>
+        <p>Using the station prediction model editor requires the following components (versions listed are those
+        it is built with - others may work!)
+        </p>
+        <ul>
+            <li>Python verson 2.7.  Note that this will not work with python 3.x</li>
+            <li>Python modules numpy (1.6.2), scipy (0.10.1), matplotlib (1.2.1), PyQt4 (4.9.1)</li>
+        </ul>
+        <p>As currently built the editor modules (spm_editor.py, stn_pred_model.py, ellipsoid.py) should be
+        installed in a single directory with the models in a "models" subdirectory, and the time series data
+        in a "timeseries" subdirectory.
+        </p>
+        <p>
+        To run the editor just use "python spm_editor.py".
+        </p>
+        <h1>Configuration</h1>
+        <p>The editor may be configured by editing the spm_editor.cfg file that is in the same directory
+        as the editor itself.  The configuration allows setting the templates for the names of model files, 
+        backup files, and time series files.  Each file must include the string <tt>{code}</tt> that 
+        will be substituted by the four letter station code.  The backup file may also include the strings
+        <tt>{fdate}</tt> and <tt>{fdatetime}</tt>, that will be replaced with the file date, or file date/time
+        to create backup file names.  The editor assumes that all time series files are in the same 
+        directory.  A sample configuration file is:
+        </p>
+        <pre>
+
+# Configuration data for the Station Prediction Model editor
+#
+#  model_dir is the directory in which models are located
+
+model_file        stations/{code}_spm.xml
+model_backup_file {model_file}.{fdatetime}.backup
+
+timeseries_file   timeseries/{code}_igs08_xyz.dat
+
+        </pre>
+        </p>
+        <h1>Overview</h1>
+        <p>
+        The station prediction model editor is used to view CORS station time series and develop station
+        prediction models representing the time series.  Models can have the following components:
+        </p>
+        <ul>
+            <li>offset: A constant offset relative to the reference coordinate for the station</li>
+            <li>velocity: A constant velocity</li>
+            <li>annual: An annual cyclic signal (cos/sin)</li>
+            <li>semiannual: A semiannual cyclic signal (cos/sin)</li>
+            <li>equipment_offset: A step offset in the position at a given time</li>
+            <li>tectonic_offset: A step offset in the position at a given time, the same as an 
+            equipment offset in effect, but assigned to a tectonic origin</li>
+            <li>exponential_decay: Represents post seismic relaxation by an exponential decay</li>
+            <li>slow_slip: A slow slip event represented by an error function</li>
+            <li>slow_slip_ramp: A slow slip event represented by an ramp function</li>
+        </ul>
+        <p>Station prediction models are stored as XML files in the stations directory (by default).</p>
+        <p>Time series data are stored text files in the timeseries directory.  The time series are
+        daily IGS08 solutions.  The file is formatted as the following example:
+        </p>
+        <pre>
+name	epoch	x	y	z	flag
+GISB	2002-06-28T12:00:00	-4985376.1519	184022.2282	-3960830.1338	A
+GISB	2002-06-29T12:00:00	-4985376.1555	184022.2283	-3960830.1362	A
+GISB	2002-06-30T12:00:00	-4985376.1547	184022.2259	-3960830.1330	A
+GISB	2002-07-01T12:00:00	-4985376.1536	184022.2258	-3960830.1338	A
+GISB	2002-07-02T12:00:00	-4985376.1505	184022.2275	-3960830.1295	A
+GISB	2002-07-03T12:00:00	-4985376.1592	184022.2264	-3960830.1369	A
+GISB	2002-07-04T12:00:00	-4985376.1539	184022.2272	-3960830.1318	A
+...
+</pre>
+        <p>Columns are separated by arbitrary whitespace.  The name column must match the station code.
+        The flag column is ignored and not required.
+        </p>
+        <h1>Usage</h1>
+
+        The editor can be started using the following command:
+<pre>
+usage: spm_editor [-h] [-c CONFIG_FILE] [-m DEFAULT_MODEL_FILE]
+                  [-t DEFAULT_TIMESERIES_FILE]
+                  [model_file] [timeseries_file]
+
+View and update GNSS time series models
+
+positional arguments:
+  model_file            Station prediction model XML file
+  timeseries_file       XYZ time series to use with the model
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c CONFIG_FILE, --config_file CONFIG_FILE
+                        Configuration file for the job
+  -m DEFAULT_MODEL_FILE, --default_model_file DEFAULT_MODEL_FILE
+                        Default file name for the model file - must include
+                        {code}
+  -t DEFAULT_TIMESERIES_FILE, --default_timeseries_file DEFAULT_TIMESERIES_FILE
+                        Default file name for the model file - must include
+                        {code}
+</pre>
+        <p>
+        Optionally a SPM model file and timeseries file can be specified on the command line.  
+        Otherwise it will find all time series files (based on the configuration file time series filename pattern)
+        and then look for corresponding station prediction models (or create new model files if there is not 
+        already one).
+        </p>
+        <p>
+        The command line options also allow specifying a configuration file (default is ~/.spm_editor.cfg, or
+        a spm_editor.cfg file in the same directory as the program). The model_file and timeseries_file 
+        configuration options can be overridden on the command line.
+        </p>
+        <p>
+        If the model file is not specified on the command line, then the codes of the matching 
+        time series files are displayed in a dropdown list.  When a code is selected
+        the corresponding time series data are displayed (as E,N,U offsets from a reference point), and
+        the station prediction model (SPM) is loaded, if it exists.  The editor can be used to update the 
+        model, adding and removing components, and fitting the components to the timeseries.  It can also 
+        be used to select bad observations that should be removed from the time series.
+        </p>
+        <img width="100%" src="spm_editor.png" />
+        <p>
+        The top half of the editor displays the time series for the selected stations, and the bottom has
+        from left to right:
+        </p>
+        <ul>
+            <li>The station selector</li>
+            <li>Modelled stations only: if selected then only stations with existing models will be displayed.
+            For timeseries without a model, a default model is generated consisting of just the offset, velocity, 
+            annual, and semiannual terms, all set to zero offsets.</li>
+            <li>Summary statistics.  The obs statistics are based on the 95%ile of the difference between
+            adjacent observations.  These are used for relative weighting of components when fitting the 
+            model.  The residual stats are based on the 95%ile of the difference between the 
+            observed and model values. (These may need some refinement)
+            </li>
+            <li>
+            The table of model components.  Each component has a "Use" status, which can be used to
+            remove the component from the model, but still keep information about it, and a Fit? status,
+            discussed below.  A component can be selected to display its parameters in the box to the right.
+            </li>
+            <li>Remove:  Completely removes the selected compojnent from the model</li>
+            <li>Add: To add a new component, select the type of component and the date at which it applies,
+            then click the add button.  The date can be selected by clicking on the time series plots.
+            </li>
+            <li>Event: An optional name for the component, eg the name of an earthquake, or a description of 
+            equipment change</li>
+            <li>Component parameter tables: Each parameter has a Fit? status, a name, a value, and an
+            error.  The error is the estimated error from the last fitting operation applied to the 
+            model.  It uses light grey text if this was not the last fit actually done.</li>
+            <li>Fit: when this is clicked the editor will recalculate the currently selected parameters to
+            the time series.  The selected parameters are those of the current component, and those of any
+            other component with the Fit? status set. The fit uses the scipy leastsq function 
+            which is a wrapper around MINPACK's lmdif and lmder algorithms.
+            </li>
+            <li>Fit: when this is clicked the editor will recalculate all linear parameters of all 
+            enabled components for which the parameter Fit? status is selected.  The fit status of the 
+            components are ignored (all enabled components are used).  Linear parameters include velocities
+            and offsets, but not event dates and durations.
+            The fit uses the scipy leastsq function 
+            which is a wrapper around MINPACK's lmdif and lmder algorithms.
+            </li>
+            <li>Undo: reverses the last change made to the model</li>
+            <li>Redo: redo the last change reversed</li>
+        </ul>
+        <p>Directly under the plot are a set of controls for managing the plots.  From right to left these are:</p>
+        <ul>
+            <li>Home button: returns the view to original unzoomed state</li>
+            <li>Previous view button: returns the view to previous zoom state</li>
+            <li>Next view button: go to next view after previous</li>
+            <li>Pan button: click to start panning the plots</li>
+            <li>Zoom button: click to start selecting areas to zoom in to</li>
+            <li>Use obs button: click to start picking observations to include or exclude from the model fit</li>
+            <li>Use all obs button: click to clear the list of unused observations</li>
+            <li>Auto reject button: click to automatically select observations to reject</li>
+            <li>Save plot button: click to save a copy of the current plot as a PNG file<li>
+            fit and statistics.  Note: this won't work will the zoom or pan buttons are selected - to be 
+            tidied up!</li>
+            <li>Detrend checkbox: Select or unselect to remove the trend from the plots.  Normally selected to 
+            make it easier to see details of the plots
+            </li>
+            <li>Time as days checkbox: Select to show the date axis as days after 1 Jan 2000 rather than as dates</li>
+        </ul>
+        <h1>To do list</h1>
+        <p>GUI improvements: 
+        Fix the handling of the include/exclude control with the other plot control buttons 
+        and the plot cursor state.  
+        Add a list of tectonic events to the plot that can by used to select an event for a 
+        new component.  
+        Option to display an individual component on the plot.
+        Display the location of the station.
+        </p>
+    </body>
+</html>

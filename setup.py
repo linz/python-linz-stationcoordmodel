@@ -86,7 +86,8 @@ setup(
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
     package_data={
-        'LINZ':['spm_editor.cfg','CORS_Analyst.cfg','report_datum_status.cfg'],
+        'LINZ':['spm_editor.cfg','CORS_Analyst.cfg','report_datum_status.cfg',
+                'spm_editor_help.html','spm_editor.png']
     },
 
     # Namespace package - other modules may include into these packages
