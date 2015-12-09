@@ -357,7 +357,12 @@ class AppForm(QMainWindow):
         self.reloadCodeList()
 
     def read_config(self,cfgfile,options=None):
-        config={x:None for x in 'model_file model_backup_file timeseries_file timeseries_type update_availability'.split()}
+        config={x:None for x in '''
+                model_file model_backup_file timeseries_file timeseries_type 
+                update_availability
+                robust_se_percentile 
+                outlier_reject_level
+                outlier_test_range'''.split()}
         if cfgfile and os.path.exists(cfgfile):
             with open(cfgfile) as cfg:
                 for l in cfg:
@@ -385,6 +390,9 @@ class AppForm(QMainWindow):
             raise RuntimeError('Configuration item model_backup_file must include "{model_file}" or "{code}"')
     
         self.timeseries_file=config.get('timeseries_file',default_timeseries_file)
+        self.robust_se_percentile=float(config.get('robust_se_percentile','95.0'))
+        self.outlier_reject_level=float(config.get('outlier_reject_level','5.0'))
+        self.outlier_test_range=float(config.get('outlier_test_range','10.0'))
         solutiontypes=config.get('timeseries_type','')
         solutiontypes=[] if solutiontypes == '' else solutiontypes.split('+')
         self.solutiontypes=solutiontypes
@@ -763,7 +771,10 @@ class AppForm(QMainWindow):
 
     def autoRejectObsClicked( self ):
         if self.model:
-            self.model.autoRejectObs()
+            self.model.autoRejectObs(
+                ndays=self.outlier_test_range,
+                tolerance=self.outlier_reject_level,
+                percentile=self.robust_se_percentile)
             self.replotUsed()
 
     def addComponent( self ):
