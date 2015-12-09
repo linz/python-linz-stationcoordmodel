@@ -1,3 +1,11 @@
+python-linz-stationcoordmodel (1.19.0-1) trusty; urgency=medium
+
+  * Adding functions to clear rejected obs and to autoreject.  Need option to set autoreject parameters
+  * Adding configuration of auto-rejection
+  * Bug fix in setting outliers - ignoring config params
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 09 Dec 2015 20:00:00 +1300
+
 python-linz-stationcoordmodel (1.18.1-1) trusty; urgency=medium
 
   * Fixing bug with multiple NZGD2000 outputs
