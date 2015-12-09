@@ -1238,7 +1238,7 @@ class Model( object ):
     def autoRejectObs( self, ndays=10, tolerance=5.0, percentile=95.0 ):
         if self.timeseries:
             outliers=self.timeseries.findOutliers( ndays=ndays, tolerance=tolerance, percentile=percentile )
-            for date in self.timeseries.findOutliers().to_pydatetime():
+            for date in outliers.to_pydatetime():
                 match=np.where(self.dates==date)[0]
                 if len(match) > 0:
                     self.setUseObs( match[0], comment='Auto rejected', use=False)
