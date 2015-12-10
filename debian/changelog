@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.19.1-1) trusty; urgency=medium
+
+  * Fixing bug fitting with rejected obs
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 10 Dec 2015 14:32:09 +1300
+
 python-linz-stationcoordmodel (1.19.0-1) trusty; urgency=medium
 
   * Adding functions to clear rejected obs and to autoreject.  Need option to set autoreject parameters
