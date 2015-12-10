@@ -1388,7 +1388,7 @@ class Model( object ):
             if m in fitting:
                 continue
             if first:
-                res=self.enu.copy()
+                res=self.enu.copy()[useobs]
                 first=False
             res -= m.calc(dates)
 
