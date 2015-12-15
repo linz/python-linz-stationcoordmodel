@@ -362,7 +362,8 @@ class AppForm(QMainWindow):
                 update_availability
                 robust_se_percentile 
                 outlier_reject_level
-                outlier_test_range'''.split()}
+                outlier_test_range
+                set_model_start_date'''.split()}
         if cfgfile and os.path.exists(cfgfile):
             with open(cfgfile) as cfg:
                 for l in cfg:
@@ -382,6 +383,7 @@ class AppForm(QMainWindow):
         self.model_file=config.get('model_file',default_model_file)
         self.model_backup_file=config.get('model_backup_file',default_model_backup_file)
         self.update_availability=config.get('update_availability','False').lower()=='true'
+        self.set_start_date=config.get('set_model_start_date','False').lower()=='true'
         if '{code}' not in self.model_file:
             raise RuntimeError('Configuration item model_file must include "{code}"')
         if ( self.model_backup_file and 
@@ -528,7 +530,7 @@ class AppForm(QMainWindow):
         self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
         code=self.model.station
         timeseries=self.timeseries_list.get(code,self.solutiontypes)
-        self.model.loadTimeSeries(timeseries)
+        self.model.loadTimeSeries(timeseries,setdate=self.set_start_date)
         if not loadfile:
             self.backedup.add(code)
         self.savestate(True)

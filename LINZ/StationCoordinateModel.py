@@ -902,6 +902,8 @@ class Model( object ):
         self.station = station or ''
         self.xyz=xyz
         self.site=site or station
+        self.startdate=None
+        self.enddate=None
         self.priority=int(priority)
         if xyz is not None:
             lon,lat,h=GRS80.geodetic(xyz)
@@ -935,6 +937,11 @@ class Model( object ):
         root.set('site',self.site)
         root.set('priority',str(self.priority))
         root.set('version_date',self.versiondate.strftime(datetimeformat))
+        if self.startdate is not None:
+            root.set('start_date',self.startdate.strftime(datetimeformat))
+        if self.enddate is not None:
+            root.set('end_date',self.enddate.strftime(datetimeformat))
+
 
     def toXmlElement( self ):
         root=ElementTree.Element(stn_tag)
@@ -1069,6 +1076,14 @@ class Model( object ):
         vrdt=root.get('version_date')
         if vrdt:
             self.versiondate=datetime.strptime(vrdt,datetimeformat)
+
+        vrdt=root.get('start_date')
+        if vrdt:
+            self.startdate=datetime.strptime(vrdt,datetimeformat)
+
+        vrdt=root.get('end_date')
+        if vrdt:
+            self.enddate=datetime.strptime(vrdt,datetimeformat)
             
         spm=root.find(cpm_tag)
         rfdt=spm.get('ref_date')
@@ -1243,7 +1258,7 @@ class Model( object ):
                 if len(match) > 0:
                     self.setUseObs( match[0], comment='Auto rejected', use=False)
 
-    def loadTimeSeries( self, timeseries, transform=None ):
+    def loadTimeSeries( self, timeseries, transform=None, setdate=False ):
         '''
         Loads a time series to be analysed with the model
 
@@ -1265,6 +1280,9 @@ class Model( object ):
         self.station=timeseries.code()
         self.xyz=timeseries.xyz0()
         self.setExcludedObs()
+        if setdate:
+            self.startdate=self.dates[0]
+
 
     def getObs( self ):
         '''
