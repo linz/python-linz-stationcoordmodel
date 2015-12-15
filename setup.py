@@ -104,6 +104,7 @@ setup(
             'analyse_cors=LINZ.CORS_Analyst:main',
             'report_datum_status=LINZ.report_datum_status:main',
             'cors_station_coordinates=LINZ.cors_station_coordinates:main',
+            'positionzpp_spm_upload=LINZ.positionzpp_spm_upload:main',
         ],
     },
 )
