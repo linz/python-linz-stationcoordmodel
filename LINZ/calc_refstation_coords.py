@@ -14,17 +14,30 @@ from datetime import datetime,date
 
 from .StationCoordinateModel import Model as spm
 
+_description='Script to compare NZGD2000 coordinates with station time series'
+_epilog='''
+
+NZGD2000 coordinates of the reference stations can either be specified
+in a CSV data file with columns 'geodeticcode lat lon ellhgt', or 
+columns 'code gdb_lon gdb_lat gdb_hgt'.  Alternatively if the filename
+is 'gdb' then the current coordinates will be downloaded from the 
+online geodetic database.
+
+'''
+
+
 def main():
     calcDate=datetime(date.today().year,1,1)
 
-    parser=argparse.ArgumentParser('Script to compare NZGD2000 coordinates with station time series')
-    parser.add_argument('gdb_file',default='gdb_coords.txt',help="Name of gdb file input file")
+    parser=argparse.ArgumentParser(_description,epilog=_epilog)
+    parser.add_argument('gdb_file',default='gdb_coords.txt',help="Name of gdb file input file, or 'gdb' to use online database")
     parser.add_argument('check_file',nargs='?',default='coord_differences.csv',help="Output csv file of coordinate comparisons")
     parser.add_argument('update_csv_file',nargs='?',help="Name of gdb coordinate upload file (default none)")
     parser.add_argument('-f','--def-dir',help="Deformation model base dir (contains tools and model)")
     parser.add_argument('-m','--model-dir',help="Directory containing deformation model")
     parser.add_argument('-s','--stn-dir',default='stations',help="Directory containing SPM xml definitions")
     parser.add_argument('-d','--calc-date',help="Calculation date for coordinates (default "+calcDate.strftime("%Y-%m-%d")+")")
+    parser.add_argument('-a','--all-marks',help="Output coord information for all marks including not in gdb")
 
     args=parser.parse_args()
 
@@ -33,6 +46,7 @@ def main():
     updfile=args.update_csv_file
     stndir=args.stn_dir
     defdir=args.def_dir
+    allmarks=args.all_marks
 
     mdldir=args.model_dir or (defdir+'/model' if defdir else 'model')
 
@@ -48,24 +62,34 @@ def main():
     itrf_tfm=Transformation(from_itrf='ITRF2008',to_itrf='ITRF96')
     defmodel=DefModel.Model(mdldir)
 
-    gdbcrds={}
-    with open(gdbfile,'r') as gdbf:
-        l=gdbf.readline()
-        l=l.lower().replace("\"","").replace(","," ")
-        if l.split() == 'code gdb_lon gdb_lat gdb_hgt'.split():
-            crdorder=(1,2,3)
-        elif l.split() == 'geodeticcode lat lon ellhgt'.split():
-            crdorder=(2,1,3)
-        else:
-            raise RuntimeError("Invalid fields in "+gdbfile)
-        for l in gdbf:
-            l=l.lower().replace("\"","").replace(","," ")
+    if gdbfile == 'gdb':
+        from LINZ.Geodetic import GDB
+        def gdbcrds( code ):
             try:
-                parts=l.split()
-                crds=[float(parts[x]) for x in crdorder]
-                gdbcrds[parts[0].upper()]=crds
+                markdata=GDB.get(code)
+                return markdata.official_coordinate
             except:
-                pass
+                return None
+    else:
+        markcrds={}
+        with open(gdbfile,'r') as gdbf:
+            l=gdbf.readline()
+            l=l.lower().replace("\"","").replace(","," ")
+            if l.split() == 'code gdb_lon gdb_lat gdb_hgt'.split():
+                crdorder=(1,2,3)
+            elif l.split() == 'geodeticcode lat lon ellhgt'.split():
+                crdorder=(2,1,3)
+            else:
+                raise RuntimeError("Invalid fields in "+gdbfile)
+            for l in gdbf:
+                l=l.lower().replace("\"","").replace(","," ")
+                try:
+                    parts=l.split()
+                    crds=[float(parts[x]) for x in crdorder]
+                    markcrds[parts[0].upper()]=crds
+                except:
+                    pass
+            gdbcrd=lambda code: markcrds.get(code)
 
     csvu=None
     if updfile:
@@ -95,7 +119,9 @@ def main():
 
         for code in sorted(codes):
             f=code+'.xml'
-            if code not in gdbcrds:
+            
+            gcrds=gdbcrds(code)
+            if gcrds is None and not allmarks:
                 continue
 
             print("Processing",code)
@@ -125,20 +151,19 @@ def main():
                 csv.write(',{0:.9f},{1:.9f},{2:.4f}'.format(*llhnz2k))
 
                 ucode=code.upper()
-                if ucode in gdbcrds:
-                    gcrds=gdbcrds[ucode] 
+                if gcrds is not None:
                     csv.write(',{0:.9f},{1:.9f},{2:.4f}'.format(*gcrds))
                     dedln,dndlt=GRS80.metres_per_degree(*gcrds)
                     edif=(gcrds[0]-llhnz2k[0])*dedln
                     ndif=(gcrds[1]-llhnz2k[1])*dndlt
                     hdif=gcrds[2]-llhnz2k[2]
                     csv.write(',{0:.4f},{1:.4f},{2:.4f}'.format(edif,ndif,hdif))
+                    if csvu:
+                        csvu.write('"{0}",{1:.9f},{2:.9f},{3:.4f},"B10","NZGD2000","2000.01.01"\n'.format(
+                            code.upper(),*llhnz2k))
                 else:
                     csv.write(',,,,,')
                 csv.write("\n")
-                if csvu and ucode in gdbcrds:
-                    csvu.write('"{0}",{1:.9f},{2:.9f},{3:.4f},"B10","NZGD2000","2000.01.01"\n'.format(
-                        code.upper(),*llhnz2k))
             except:
                 print(sys.exc_info()[1])
 
