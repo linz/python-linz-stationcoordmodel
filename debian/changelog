@@ -1,3 +1,12 @@
+python-linz-stationcoordmodel (1.20.0-1) trusty; urgency=medium
+
+  * Adding option to use online GDB to retrieve current coordinates
+  * Adding positionz_spm_upload.py
+  * Modifying SPM model code to restore start_date in XML root element - required by PositioNZ-PP code
+  * Fixing order of lat/lon
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 16 Dec 2015 14:26:02 +1300
+
 python-linz-stationcoordmodel (1.19.1-1) trusty; urgency=medium
 
   * Fixing bug fitting with rejected obs
