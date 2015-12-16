@@ -159,7 +159,7 @@ def main():
                     hdif=gcrds[2]-llhnz2k[2]
                     csv.write(',{0:.4f},{1:.4f},{2:.4f}'.format(edif,ndif,hdif))
                     if csvu:
-                        csvu.write('"{0}",{1:.9f},{2:.9f},{3:.4f},"B10","NZGD2000","2000.01.01"\n'.format(
+                        csvu.write('"{0}",{2:.9f},{1:.9f},{3:.4f},"B10","NZGD2000","2000.01.01"\n'.format(
                             code.upper(),*llhnz2k))
                 else:
                     csv.write(',,,,,')
