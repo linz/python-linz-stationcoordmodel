@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.21.0-1) trusty; urgency=medium
+
+  * Removing output CSV file if no coordinates available
+  * Minor updates
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 21 Dec 2015 09:40:31 +1300
+
 python-linz-stationcoordmodel (1.20.0-1) trusty; urgency=medium
 
   * Adding option to use online GDB to retrieve current coordinates
