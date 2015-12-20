@@ -71,7 +71,7 @@ class CORS_Analyst( object ):
         self.deformationModelVersion=self.gdbCalculator.deformationModelVersion()
 
     def gdbTimeseries( self, code, dates, xyz0=None ):
-        gdbts=self.gdbCalculator.get(code,dates=dates,xyz0=xyz0)
+        gdbts=self.gdbCalculator.get(code,xyz0=xyz0,index=dates)
         return gdbts
 
     def scmTimeseries( self, model, dates ):

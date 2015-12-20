@@ -175,7 +175,10 @@ class Timeseries( object ):
             self._transform=transform
             self._loaded=False
 
-    def setDateRange( self, after=None, before=None ):
+    def setDateRange( self, after=None, before=None, reset=False ):
+        if reset:
+            self._after=None
+            self._before=None
         if after is not None and after != self._after: 
             if isinstance(after,basestring):
                 after=dt.datetime.strptime(after,'%Y-%m-%d')
@@ -745,7 +748,18 @@ class FunctionTimeseries( Timeseries ):
         self._isfunction=True
         self.setDates( after=after, before=before, index=index, fillDays=fillDays )
         
-    def setDates( self, after=None, before=None, increment=1, index=None, fillDays=False ):
+    def setDates( self, after=None, before=None, increment=1, index=None, fillDays=False, dates=None ):
+        '''
+        Set the dates at which the function timeseries will be calculated.
+        Can initiallize with start and end dates (after=, before=), and existing pd.DateTimeIndex
+        (index=..) optionally with fillDays to fill missing days in the time series, or with an array
+        of dates (dates=[...]). 
+        '''
+
+        self.setDateRange( reset=True, after=after, before=before )
+        if dates is not None:
+            index=pd.DatetimeIndex(data=dates)
+
         if index is not None and fillDays:
             after=index[0]
             before=index[-1]
