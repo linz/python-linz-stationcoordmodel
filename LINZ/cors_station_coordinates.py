@@ -14,6 +14,7 @@ import re
 import argparse
 import datetime as dt
 import csv
+import os
 
 from .CORS_Timeseries import TimeseriesList
 from LINZ.DeformationModel.Model import deformationModelArguments, loadDeformationModel
@@ -156,7 +157,9 @@ def main():
 
         for output_csv_file in sorted(outputfiles):
             calcdates=outputfiles[output_csv_file]
-            with open(output_csv_file,'wb') as csvf:
+            ncoord=0
+            buildfile=output_csv_file+'.temp'
+            with open(buildfile,'wb') as csvf:
                 writer=csv.writer(csvf)
                 header='code epoch'.split()
                 header.extend(coord_cols)
@@ -195,6 +198,12 @@ def main():
                             except OutOfRangeError:
                                 row.extend(['','',''])
                         writer.writerow(row)
+                        ncoord+=1
+            if ncoord == 0:
+                os.unlink(buildfile)
+                print(output_csv_file+' not built as coordinates not available')
+            else:
+                os.rename(buildfile,output_csv_file)
 
     except RuntimeError as e:
         print(e.message)
