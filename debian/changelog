@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.21.1-1) trusty; urgency=medium
+
+  * Fixing errors in GDB time series and XYZ0
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 21 Dec 2015 12:20:56 +1300
+
 python-linz-stationcoordmodel (1.21.0-1) trusty; urgency=medium
 
   * Removing output CSV file if no coordinates available
