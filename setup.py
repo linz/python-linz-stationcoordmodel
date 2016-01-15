@@ -99,7 +99,7 @@ setup(
     entry_points={
         'console_scripts': [
             'calc_refstation_coords=LINZ.calc_refstation_coords:main',
-            'station_coord_model=LINZ.station_coord_model:main',
+            'station_coord_model=LINZ.station_coordinate_model:main',
             'spm_editor=LINZ.spm_editor:main',
             'analyse_cors=LINZ.CORS_Analyst:main',
             'report_datum_status=LINZ.report_datum_status:main',

@@ -62,6 +62,20 @@ def main():
     itrf_tfm=Transformation(from_itrf='ITRF2008',to_itrf='ITRF96')
     defmodel=DefModel.Model(mdldir)
 
+    logfile=None
+    logf=None
+    if updfile:
+        logfile=updfile+'.log'
+        logf=open(logfile,'w')
+        logf.write("calc_refstation_coordinates\n\n")
+        logf.write("Run time: {0:%Y-%m-%d %H:%M:%S}\n".format(datetime.now()))
+        logf.write("Deformation model: {0}\n".format(mdldir))
+        logf.write("Deformation model version: {0}\n".format(defmodel.version()))
+        logf.write("Station coordinate model directory: {0}\n".format(stndir))
+        logf.write("Coordinate comparisons written to: {0}\n".format(chkfile))
+        logf.write("GDB update file written to: {0}\n".format(updfile))
+        logf.write("Coordinate calculation date: {0:%Y-%m-%d %H:%M:%S}\n".format(calcDate))
+
     if gdbfile == 'gdb':
         from LINZ.Geodetic import GDB
         def gdbcrds( code ):
@@ -70,6 +84,8 @@ def main():
                 return markdata.official_coordinate
             except:
                 return None
+        if logf:
+            logf.write("GDB coordinates: from online geodetic database\n")
     else:
         markcrds={}
         with open(gdbfile,'r') as gdbf:
@@ -90,6 +106,8 @@ def main():
                 except:
                     pass
             gdbcrd=lambda code: markcrds.get(code)
+        if logf:
+            logf.write("GDB coordinates: {0}\n".format(gdbfile))
 
     csvu=None
     if updfile:
@@ -98,6 +116,9 @@ def main():
     with open(chkfile,'w') as csv:
         csv.write(','.join((
             'code',
+            'scm_version',
+            'deformation_version',
+            'calc_date',
             'itrf2008_X','itrf2008_Y','itrf2008_Z',
             'itrf2008_lon','itrf2008_lat','itrf2008_hgt',
             'itrf96_lon','itrf96_lat','itrf96_hgt',
@@ -107,8 +128,7 @@ def main():
         )))
         csv.write('\n');
         if csvu:
-            csvu.write("CODE,LAT,LON,EHGT,ROBG,COSY,DATE\n");
-
+            csvu.write("CODE,LAT,LON,EHGT,ROBG,COSY,DATE,COMM\n");
 
         codes=[]
         for f in os.listdir(stndir):
@@ -128,6 +148,8 @@ def main():
 
             try:
                 m=spm(filename=stndir+'/'+f)
+                if logf is not None:
+                    logf.write("{0} model version: {1:%Y-%m-%d %H:%M:%S}\n".format(code,m.versiondate))
                 # Don't want annual and semi-annual components...
                 for c in m.components:
                     if 'annual' in c.componentType():
@@ -145,6 +167,9 @@ def main():
                     llhnz2k[0] -= 360.0
 
                 csv.write('"{0}"'.format(code))
+                csv.write(',"{0:%Y-%m-%d %H:%M:%S}"'.format(m.versiondate))
+                csv.write(',"{0}"'.format(defmodel.version()))
+                csv.write(',"{0:%Y-%m-%d %H:%M:%S}"'.format(calcDate))
                 csv.write(',{0:.4f},{1:.4f},{2:.4f}'.format(*xyz08))
                 csv.write(',{0:.9f},{1:.9f},{2:.4f}'.format(*llh08))
                 csv.write(',{0:.9f},{1:.9f},{2:.4f}'.format(*llh96))
@@ -159,13 +184,18 @@ def main():
                     hdif=gcrds[2]-llhnz2k[2]
                     csv.write(',{0:.4f},{1:.4f},{2:.4f}'.format(edif,ndif,hdif))
                     if csvu:
-                        csvu.write('"{0}",{2:.9f},{1:.9f},{3:.4f},"B10","NZGD2000","2000.01.01"\n'.format(
-                            code.upper(),*llhnz2k))
+                        comment="SPM version {0:%Y-%m-%d %H:%M:%S}, Deformation model version {1}, Calc date {2:%Y-%m-%d %H:%M:%S}"
+                        comment=comment.format(m.versiondate,defmodel.version(),calcDate).replace('"','""')
+                        csvu.write('"{0}",{2:.9f},{1:.9f},{3:.4f},"B10","NZGD2000","2000.01.01","{4}"\n'.format(
+                            code.upper(),llhnz2k[0],llhnz2k[1],llhnz2k[2],comment))
                 else:
                     csv.write(',,,,,')
                 csv.write("\n")
             except:
                 print(sys.exc_info()[1])
+
+        if logf is not None:
+            logf.close()
 
 if __name__=="__main__":
     main()
