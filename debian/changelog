@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.22.0-1) trusty; urgency=medium
+
+  * Adding missing metadata to calculation of reference station coordinates
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 15 Jan 2016 14:48:45 +1300
+
 python-linz-stationcoordmodel (1.21.1-1) trusty; urgency=medium
 
   * Fixing errors in GDB time series and XYZ0
