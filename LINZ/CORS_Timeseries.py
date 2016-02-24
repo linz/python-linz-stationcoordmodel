@@ -34,7 +34,7 @@ def robustStandardError(obs,percentile=95.0):
         diffs=np.abs(obs[1:,axis]-obs[:-1,axis])
         # Note sqrt(2) accounts for the fact that these are differences
         # between two observations
-        se=np.percentile(diffs,percentile)/(ppf*np.sqrt(2))
+        se=np.percentile(diffs[~np.isnan(diffs)],percentile)/(ppf*np.sqrt(2))
         errors[axis]=se
     return np.array(errors)
 
