@@ -278,7 +278,8 @@ class Timeseries( object ):
            baseplot to plot againt a specified baseplot
            
            Additional keywords are passed to the pyplot.subplots function
-           call.
+           call or pyplot.plot call (depending on the keyword, the most common
+           plot keywords are passed to plot).
         '''
 
         import matplotlib.pyplot as plt
@@ -287,6 +288,15 @@ class Timeseries( object ):
         default_symbols=['b+','r+','g+','m+']
         default_lines=['b-','r-','g-','m-']
 
+        plotkwds={}
+        for kw in kwds:
+            if (kw in 'aa antialiased alpha lw ls mec mew mfc mfcalt ms'.split()
+                or kw.startswith('marker')
+                or kw.startswith('line')):
+                plotkwds[kw]=kwds[kw]
+        for kw in plotkwds:
+            del kwds[kw]
+
         havebase=True
         if baseplot is None:
             havebase=False
@@ -294,7 +304,7 @@ class Timeseries( object ):
             title="{0} {1} timeseries".format(self._code,self._solutiontype)
             if detrend:
                 title=title+' detrended'
-
+            
             settings={'sharex':True,'sharey':samescale,'figsize':(8,6),'dpi':100}
             settings.update(kwds)
             fig, plots=plt.subplots(3,1,**settings)
@@ -362,7 +372,7 @@ class Timeseries( object ):
             if mmunits:
                 series=series*1000
                 ylabel=ylabel+' mm'
-            plots[i].plot(data.index,series,symbol,label=self._code+' '+self._solutiontype,picker=5)
+            plots[i].plot(data.index,series,symbol,label=self._code+' '+self._solutiontype,picker=5,**plotkwds)
             if not havebase:
                 plots[i].set_ylabel(ylabel)
                 plots[i].tick_params(labelsize=8)

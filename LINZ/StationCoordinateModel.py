@@ -1298,6 +1298,20 @@ class Model( object ):
         return self.dates,self.enu,self.useobs
 
 
+    def getCalcTimeseries( self, dates=None ):
+        try:
+            from LINZ import CORS_Timeseries
+        except ImportError:
+            raise RuntimeError('LINZ.CORS_Timeseries not installed')
+        dates=self.dates if dates is None else dates
+        if 'to_pydatetime' in dir(dates):
+            dates=dates.to_pydatetime()
+        spmxyz=self.calc(dates,enu=False)
+        code=self.station
+        xyz0=self.xyz
+        ts=CORS_Timeseries.Timeseries(code,solutiontype='scm',dates=dates,xyz=spmxyz,xyz0=xyz0)
+        return ts
+
     def clearCovariance( self ):
         '''
         Empties the covariance matrix - this is recomputed each time a fit is calculated
