@@ -290,7 +290,7 @@ class Timeseries( object ):
 
         plotkwds={}
         for kw in kwds:
-            if (kw in 'aa antialiased alpha lw ls mec mew mfc mfcalt ms'.split()
+            if (kw in 'aa antialiased alpha c color lw ls mec mew mfc mfcalt ms'.split()
                 or kw.startswith('marker')
                 or kw.startswith('line')):
                 plotkwds[kw]=kwds[kw]
