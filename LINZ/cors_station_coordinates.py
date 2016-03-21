@@ -28,7 +28,7 @@ def main():
     epilog='''
     Available coordinate systems are NZGD2000, ITRFxxxx.  These are geographic coordinates.
     For geocentric coordinates add _XYZ.  Multiple coordinate systems can be entered, eg
-    ITRF20008+NZGD2000
+    ITRF2008+NZGD2000
 
     The epoch can be formatted as YYYY-MM-DD or now-#### for #### days before now.
     A range of dates can be selected as date1:date2
@@ -123,7 +123,7 @@ def main():
                 def transformation(xyz,date):
                     llh=GRS80.geodetic(xyz)
                     llh2k=itrf_nzgd2000.transform(llh[0],llh[1],llh[2],date)
-                    return GRS80.xyz(llh)
+                    return GRS80.xyz(llh2k)
             else:
                 transformation=ITRF.Transformation(from_itrf=cors_itrf,to_itrf=csbase).transform
             conversions.append((transformation,isgeodetic))
