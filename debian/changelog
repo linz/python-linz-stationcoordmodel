@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.22.2-1) trusty; urgency=medium
+
+  * Fixing debian/rules executable status
+  * Fixed bug generating NZGD2000 coordinates from ITRF2008 coords
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 22 Mar 2016 06:36:43 +1300
+
 python-linz-stationcoordmodel (1.22.1-1) trusty; urgency=medium
 
   * Getting rid of NaNs in computing standard errors
