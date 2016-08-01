@@ -1005,24 +1005,27 @@ class Model( object ):
             raise ValueError(filename+' is not for station '+self.station)
         return root
 
-    def save( self, filename=None, updateAvailability=False, updateCheckFunc=None ):
+    def save( self, filename=None, updateAvailability=False, updateCheckFunc=None, keepVersionDate=False ):
         '''
         Save the model.
 
         Args:
             filename              Can reset the name of the output file (may contain {code})
             updateAvailability    If true then the availability of data will be reset based on
-                                  gaps in the time series
+                                  gaps in the time series. Set to "clear" to remove availability
+                                  information.
             updateCheckFunc       Optional function used to confirm whether data is actually
                                   available even if there is not a time series entry for a day.
                                   If set to true, then the outages will be cleared from the 
                                   model.
+            keepVersionDate       Set to true to leave the version date unchanged
         '''
         filename = self.getFilename( filename )
         if not filename:
             raise ValueError('No file name specified for saving station prediction model')
 
-        self.versiondate=datetime.now()
+        if not keepVersionDate:
+            self.versiondate=datetime.now()
         root = self.toXmlElement()
         if os.path.exists(filename):
             oldroot=self.readStationXmlFile(filename)
@@ -1035,7 +1038,9 @@ class Model( object ):
 
         self.updateXmlAttributes( root )
 
-        if updateAvailability:
+        if updateAvailability=="clear":
+            self.removeAvailability(root)
+        elif updateAvailability:
             self.updateAvailability(root,updateCheckFunc)
 
         with open(filename,'w') as f:
@@ -1232,8 +1237,11 @@ class Model( object ):
             self.excluded.sort( key=lambda x: x.day )
 
     def clearExcludedObs( self ):
-        for index in [e.index for e in self.excluded]:
-            self.setUseObs(index)
+        if self.dates is not None:
+            for index in [e.index for e in self.excluded]:
+                self.setUseObs(index)
+        else:
+            self.excluded=[]
 
     def setExcludedObs( self ):
         '''
@@ -1511,11 +1519,17 @@ class Model( object ):
                             outages.append(outage)
                 nextdate=obsdate+oneday
 
+        self.removeAvailability(root)
+        root.append(outages)
+
+    def removeAvailability(self,root):
+        '''
+        remove outage information from the xml object
+        '''
         oldoutages=root.find(outages_tag)
         if oldoutages is not None:
             root.remove(oldoutages)
-        root.append(outages)
-
+        
     def __str__( self ):
         '''
         Print a readable description of the model.
@@ -1623,9 +1637,23 @@ class Model( object ):
                         break
         self.sortComponents()
 
+def clean():
+    import argparse
+    parser=argparse.ArgumentParser(description="Clean unnecessary data from station coordinate models (covariance, excluded observatiions, outages)")
+    parser.add_argument("scm_file",nargs="+",help="Station coordinate .XML files")
+    args=parser.parse_args()
+
+    for scmf in args.scm_file:
+        try:
+            scm=Model(filename=scmf)
+            scm.clearCovariance()
+            scm.clearExcludedObs()
+            scm.save(updateAvailability="clear",keepVersionDate=True)
+        except Exception as ex:
+            print "Failed for {0}: {1}\n".format(scmf,ex.message)
+
 def main():
     import argparse
-
     parser=argparse.ArgumentParser('Calculate a time series from a station coordinate model')
     parser.add_argument('code',help='Code of station to calculate or the name of a model file')
     parser.add_argument('start_date',nargs='?',help='Start date for calculating (YYYY-MM-DD) or filename')
