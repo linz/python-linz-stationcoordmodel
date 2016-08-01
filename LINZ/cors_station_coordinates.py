@@ -15,6 +15,7 @@ import argparse
 import datetime as dt
 import csv
 import os
+import pandas as pd
 
 from .CORS_Timeseries import TimeseriesList
 from LINZ.DeformationModel.Model import deformationModelArguments, loadDeformationModel
@@ -174,6 +175,9 @@ def main():
                         except KeyError:
                             continue
 
+                        if type(crd) is pd.DataFrame:
+                            print("Ambiguous coordinates {0} at date {1}".format(code,calcdate))
+                            crd=crd[-1:].ix[calcdate]
                         xyz_2008=[crd.x,crd.y,crd.z]
                         if not check_xyz(xyz_2008):
                             continue
