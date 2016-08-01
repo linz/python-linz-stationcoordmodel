@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.23.0-1) trusty; urgency=medium
+
+  * Fixing handling of duplicate coordinates in database
+  * Adding spm_clean and rename of StationCoordinateModel module
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 02 Aug 2016 11:57:41 +1200
+
 python-linz-stationcoordmodel (1.22.2-1) trusty; urgency=medium
 
   * Fixing debian/rules executable status
