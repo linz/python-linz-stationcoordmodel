@@ -604,10 +604,15 @@ class SqliteTimeseries( Timeseries ):
         seriescodes=pd.read_sql(SqliteTimeseries._sqlList, db )
         db.close()
         series=[]
+        stypes=solutiontype.split('+') if solutiontype else None
+        found=[]
         for i in seriescodes.index:
             code,solntype=(seriescodes.code[i],seriescodes.solution_type[i])
-            if solutiontype is None or solutiontype == solntype:
-                series.append(SqliteTimeseries(dbfile,code,solntype,after=after,before=before,normalize=normalize))
+            if stypes is None or solntype in stypes:
+                if (code,solutiontype) in found:
+                    continue
+                series.append(SqliteTimeseries(dbfile,code,solutiontype,after=after,before=before,normalize=normalize))
+                found.append((code,solutiontype))
         return series
 
     def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None, before=None, normalize=False ):

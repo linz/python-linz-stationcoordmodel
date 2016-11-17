@@ -25,7 +25,11 @@ from PyQt4.QtGui import *
 
 import matplotlib
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg
+try:
+    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+except ImportError:
+    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
@@ -246,10 +250,10 @@ class ParamTableModel( QAbstractTableModel ):
         return QVariant()
 
 
-class NavigationToolbar( NavigationToolbar2QTAgg ):
+class SPMNavigationToolbar( NavigationToolbar ):
 
     def __init__(self, canvas, parent ):
-        NavigationToolbar2QTAgg.__init__(self,canvas,parent)
+        NavigationToolbar.__init__(self,canvas,parent)
         self.canvas=canvas
         next=None
         for c in self.findChildren(QToolButton):
@@ -396,9 +400,8 @@ class AppForm(QMainWindow):
         self.outlier_reject_level=float(config.get('outlier_reject_level','5.0'))
         self.outlier_test_range=float(config.get('outlier_test_range','10.0'))
         solutiontypes=config.get('timeseries_type','')
-        solutiontypes=[] if solutiontypes == '' else solutiontypes.split('+')
         self.solutiontypes=solutiontypes
-        self.timeseries_list=TimeseriesList(self.timeseries_file)
+        self.timeseries_list=TimeseriesList(self.timeseries_file,solutiontypes or None)
 
     def savePlot(self):
         file_choices = "PNG file (*.png)"
@@ -529,7 +532,7 @@ class AppForm(QMainWindow):
         loadfile=os.path.exists(modelFile)
         self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
         code=self.model.station
-        timeseries=self.timeseries_list.get(code,self.solutiontypes)
+        timeseries=self.timeseries_list.get(code)
         self.model.loadTimeSeries(timeseries,setdate=self.set_start_date)
         if not loadfile:
             self.backedup.add(code)
@@ -817,7 +820,7 @@ class AppForm(QMainWindow):
         
         # Create the navigation toolbar, tied to the canvas
         #
-        self.toolbar = NavigationToolbar(self.canvas, self.main_frame)
+        self.toolbar = SPMNavigationToolbar(self.canvas, self.main_frame)
         self.toolbar.unrejectObs.triggered.connect(self.unrejectObsClicked)
         self.toolbar.autoRejectObs.triggered.connect(self.autoRejectObsClicked)
         
