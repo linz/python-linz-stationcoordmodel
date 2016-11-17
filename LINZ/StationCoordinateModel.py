@@ -949,7 +949,7 @@ class Model( object ):
         
         spm=ElementTree.Element(cpm_tag)
         spm.set('ref_date',self.refdate.strftime(datetimeformat))
-        if self.xyz != None:
+        if self.xyz is not None:
             spm.set('X0',str(self.xyz[0]))
             spm.set('Y0',str(self.xyz[1]))
             spm.set('Z0',str(self.xyz[2]))
