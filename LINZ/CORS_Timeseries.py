@@ -211,7 +211,7 @@ class Timeseries( object ):
         columns=[columns] if isinstance(columns,basestring) else list(columns)
         series=self._data[columns]
         trends=[]
-        days=mdates.date2num(self._data.index)
+        days=mdates.date2num(self._data.index.to_pydatetime())
         pfit=np.polyfit(days,series,1)
         trends=[np.poly1d(pfit[:,i])(days) for i,c in enumerate(columns)]
         return pd.DataFrame(np.vstack(trends).T,index=self._data.index,columns=columns)
@@ -359,14 +359,14 @@ class Timeseries( object ):
             trendp=None
             days=None
             if detrend and (independent or not havebase):
-                days=mdates.date2num(data.index)
+                days=mdates.date2num(data.index.to_pydatetime())
                 trendp=np.poly1d(np.polyfit(days,series,1))
                 baseplot['trends'][i]=trendp
             else:
                 trendp=baseplot['trends'][i]
             if trendp is not None:
                 if days is None:
-                    days=mdates.date2num(data.index)
+                    days=mdates.date2num(data.index.to_pydatetime())
                 trend=trendp(days)
                 series=(series-trend)
             if mmunits:

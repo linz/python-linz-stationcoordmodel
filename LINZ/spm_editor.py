@@ -714,6 +714,8 @@ class AppForm(QMainWindow):
             savefixed = component.fixed()
             component.setFixed(False)
         app=QApplication.instance()
+        self.statusText.setText('Fitting ...')
+        message='Failed'
         try:
             app.setOverrideCursor(Qt.WaitCursor)
             ok, message = model.fit()
@@ -734,6 +736,8 @@ class AppForm(QMainWindow):
             return
         app=QApplication.instance()
         component=self.params.component
+        self.statusText.setText('Fitting ...')
+        message='Failed'
         try:
             app.setOverrideCursor(Qt.WaitCursor)
             ok, message = model.fitAllLinear()
