@@ -545,10 +545,10 @@ class Timeseries( object ):
             rsets2=ts2.robustStandardError()
             ts1=ts1.getData()-ts1.trend()
             ts2=ts2.getData()-ts2.trend()
-            print(self.ts1_solution,"solution detrended stats")
+            print(self.ts1.solutiontype(),"solution detrended stats")
             print(ts1.describe())
             print("Robust SE: ",rsets1)
-            print(self.ts2_solution,"solution detrended stats")
+            print(self.ts2.solutiontype(),"solution detrended stats")
             print(ts2.describe())
             print("Robust SE: ",rsets2)
 
@@ -609,10 +609,10 @@ class SqliteTimeseries( Timeseries ):
         for i in seriescodes.index:
             code,solntype=(seriescodes.code[i],seriescodes.solution_type[i])
             if stypes is None or solntype in stypes:
-                if (code,solutiontype) in found:
+                if (code,solntype) in found:
                     continue
-                series.append(SqliteTimeseries(dbfile,code,solutiontype,after=after,before=before,normalize=normalize))
-                found.append((code,solutiontype))
+                series.append(SqliteTimeseries(dbfile,code,solntype,after=after,before=before,normalize=normalize))
+                found.append((code,solntype))
         return series
 
     def __init__( self, dbfile, code, solutiontype='default', xyz0=None, transform=None, after=None, before=None, normalize=False ):

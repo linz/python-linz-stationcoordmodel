@@ -1026,6 +1026,8 @@ def main():
             print(f.read())
         sys.exit()
 
+    if args.config_file:
+        cfgfile=args.config_file
     if args.model_file:
         options['model_file']=args.default_model_file
     if args.timeseries_file:
