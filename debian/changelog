@@ -1,3 +1,11 @@
+python-linz-stationcoordmodel (1.24.1-1) xenial; urgency=medium
+
+  * Fix comparison warning
+  * Fix for converting datetime64 to ordinal - not sure how it worked before or why it stopped
+  * Fixing error reading solutions from SQLite
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 14 Jun 2017 12:42:26 +1200
+
 python-linz-stationcoordmodel (1.23.0-1) trusty; urgency=medium
 
   * Fixing handling of duplicate coordinates in database
