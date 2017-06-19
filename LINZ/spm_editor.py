@@ -363,6 +363,7 @@ class AppForm(QMainWindow):
     def read_config(self,cfgfile,options=None):
         config={x:None for x in '''
                 model_file model_backup_file timeseries_file timeseries_type 
+                before after
                 update_availability
                 robust_se_percentile 
                 outlier_reject_level
@@ -401,7 +402,8 @@ class AppForm(QMainWindow):
         self.outlier_test_range=float(config.get('outlier_test_range','10.0'))
         solutiontypes=config.get('timeseries_type','')
         self.solutiontypes=solutiontypes
-        self.timeseries_list=TimeseriesList(self.timeseries_file,solutiontypes or None)
+        self.timeseries_list=TimeseriesList(self.timeseries_file,solutiontypes or None,
+              after=config.get('after'),before=config.get('before'))
 
     def savePlot(self):
         file_choices = "PNG file (*.png)"
@@ -574,7 +576,7 @@ class AppForm(QMainWindow):
         self.residual_rse=[0,0,0]
         self.obs_count=0
         dates,obs,useobs = self.model.getObs()
-        if dates==None or obs==None or len(obs) == 0:
+        if dates is None or obs is None or len(obs) == 0:
             return
 
         self.obs_count=len(dates)
@@ -1016,6 +1018,8 @@ def main():
     parser.add_argument('-c','--example-config_file',action='store_true',help='Print an example configuration file')
     parser.add_argument('-m','--model_file',help='Default file name for the model file - can include {code}')
     parser.add_argument('-t','--timeseries_file',help='Timeseries file name (append :type for solution type)')
+    parser.add_argument('-a','--after',help='Only use data after date (YYYY-MM-DD)')
+    parser.add_argument('-b','--before',help='Only use data before date (YYYY-MM-DD)')
 
     args=parser.parse_args()
 
@@ -1035,6 +1039,10 @@ def main():
         options['timeseries_file']=parts[0]
         if len(parts) > 1:
             options['timeseries_type']=parts[1]
+    if args.after:
+        options['after']=args.after
+    if args.before:
+        options['before']=args.before
 
     app = QApplication(sys.argv)
     form = AppForm(cfgfile=cfgfile,options=options)
