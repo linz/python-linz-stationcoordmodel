@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.25.0-1) xenial; urgency=medium
+
+  * Adding before and after options to configuration/command line
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 24 Jul 2017 11:07:31 +1200
+
 python-linz-stationcoordmodel (1.24.1-1) xenial; urgency=medium
 
   * Fix comparison warning
