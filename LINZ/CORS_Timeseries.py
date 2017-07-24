@@ -91,6 +91,7 @@ class Timeseries( object ):
         transform       A transformation function applied to the XYZ coordinates 
         after           The earliest date of interest
         before          The latest date of interest
+        normalize       Normalize the observation dates
         '''
 
         self._loaded=False

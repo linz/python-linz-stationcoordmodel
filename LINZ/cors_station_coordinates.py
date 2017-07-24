@@ -104,6 +104,7 @@ def main():
             raise RuntimeError("No dates defined for station coordinates")
 
         itrf_nzgd2000=None
+        nzgd2000_version=''
         conversions=[]
         geodetic_suffix='_lon _lat _ehgt'.split()
         xyz_suffix='_X _Y _Z'.split()
@@ -120,6 +121,7 @@ def main():
             if csbase == 'NZGD2000':
                 if not itrf_nzgd2000:
                     defmodel=loadDeformationModel(args)
+                    nzgd2000_version=defmodel.version()
                     itrf_nzgd2000=ITRF_NZGD2000.Transformation(itrf=cors_itrf,model=defmodel)
                 def transformation(xyz,date):
                     llh=GRS80.geodetic(xyz)
@@ -163,6 +165,8 @@ def main():
             with open(buildfile,'wb') as csvf:
                 writer=csv.writer(csvf)
                 header='code epoch'.split()
+                if nzgd2000_version:
+                    header=append('nzgd2000_version')
                 header.extend(coord_cols)
                 writer.writerow(header)
                 for code in tslist.codes():
@@ -183,6 +187,8 @@ def main():
                             continue
 
                         row=[code,calcdate.strftime('%Y-%m-%d')]
+                        if nzgd2000_version:
+                            row.append(nzgd2000_version)
                         for transformation, isgeodetic in conversions:
                             try:
                                 xyz=transformation(xyz_2008,calcdate)
