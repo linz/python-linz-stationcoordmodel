@@ -166,7 +166,7 @@ def main():
                 writer=csv.writer(csvf)
                 header='code epoch'.split()
                 if nzgd2000_version:
-                    header=append('nzgd2000_version')
+                    header.append('nzgd2000_version')
                 header.extend(coord_cols)
                 writer.writerow(header)
                 for code in tslist.codes():
