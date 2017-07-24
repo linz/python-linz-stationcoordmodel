@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.26.0-1) xenial; urgency=medium
+
+  * Adding deformation model version to monthly coordinate files
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 25 Jul 2017 09:35:33 +1200
+
 python-linz-stationcoordmodel (1.25.0-1) xenial; urgency=medium
 
   * Adding before and after options to configuration/command line
