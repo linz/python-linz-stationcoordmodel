@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.27.0-1) xenial; urgency=medium
+
+  * Fixing handling of multiple time series types
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 17 Oct 2017 09:14:05 +1300
+
 python-linz-stationcoordmodel (1.26.1-1) xenial; urgency=medium
 
   * Bug fix
