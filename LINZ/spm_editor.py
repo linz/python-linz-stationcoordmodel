@@ -532,17 +532,20 @@ class AppForm(QMainWindow):
 
     def loadModel(self,modelFile,code=None):
         loadfile=os.path.exists(modelFile)
-        self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
-        code=self.model.station
-        timeseries=self.timeseries_list.get(code)
-        self.model.loadTimeSeries(timeseries,setdate=self.set_start_date)
-        if not loadfile:
-            self.backedup.add(code)
-        self.savestate(True)
-
-        dates,obs,useobs = self.model.getObs()
-        message="{0}: {1} observations".format(code,len(dates))
-        self.statusText.setText(message)
+        try:
+            self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
+            code=self.model.station
+            timeseries=self.timeseries_list.get(code)
+            self.model.loadTimeSeries(timeseries,setdate=self.set_start_date)
+            if not loadfile:
+                self.backedup.add(code)
+            self.savestate(True)
+            dates,obs,useobs = self.model.getObs()
+            message="{0}: {1} observations".format(code,len(dates))
+            self.statusText.setText(message)
+        except RuntimeError as ex:
+            self.statusText.setText(ex.message)
+            self.model=None
 
         self.loadComponent(None)
         self.eventName.setText('')

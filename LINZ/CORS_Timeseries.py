@@ -605,11 +605,12 @@ class SqliteTimeseries( Timeseries ):
         seriescodes=pd.read_sql(SqliteTimeseries._sqlList, db )
         db.close()
         series=[]
-        stypes=solutiontype.split('+') if solutiontype else None
         found=[]
+        stypes=solutiontype.split('+') if solutiontype else None
         for i in seriescodes.index:
             code,solntype=(seriescodes.code[i],seriescodes.solution_type[i])
             if stypes is None or solntype in stypes:
+                solntype=solutiontype or solntype
                 if (code,solntype) in found:
                     continue
                 series.append(SqliteTimeseries(dbfile,code,solntype,after=after,before=before,normalize=normalize))
@@ -801,27 +802,29 @@ class FunctionTimeseries( Timeseries ):
         data=pd.DataFrame(data=xyzdata,index=index.copy(),columns=('x','y','z'))
         return data
 
-class TimeseriesList( list ):
+class TimeseriesList( object ):
 
     def __init__( self, source=None, solutiontype=None, after=None, before=None, normalize=False ):
-        list.__init__(self)
+        series=[]
+        self._series=series
         if source is not None:
             if '{code}' in source:
-                self.extend(FileTimeseries.seriesList(source,solutiontype, after=after, before=before, normalize=normalize))
+                series.extend(FileTimeseries.seriesList(source,solutiontype, after=after, before=before, normalize=normalize))
             else:
-                self.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before, normalize=normalize ))
+                series.extend(SqliteTimeseries.seriesList(source, solutiontype, after=after, before=before, normalize=normalize ))
 
     def codes( self ):
         codes={}
-        for f in self:
+        for f in self._series:
             codes[f.code()]=1
         return sorted(codes.keys())
 
     def solutiontypes( self ):
-        solutiontypes={}
-        for f in self:
-            solutiontypes[f.solutiontype()]=1
-        return sorted(solutiontypes.keys())
+        solutiontypes=set()
+        for f in self._series:
+            for s in f.solutiontype().split('+'):
+                solutiontypes.add(s)
+        return sorted(solutiontypes)
 
     def get( self, code, solutiontype=[], after=None, before=None ):
         '''
@@ -838,7 +841,8 @@ class TimeseriesList( list ):
             solutiontype=[solutiontype] 
         potential=None
         priority=len(solutiontype)
-        for series in self:
+        ambiguous=False
+        for series in self._series:
             if series.code() != code:
                 continue
             if len(solutiontype) > 0:
@@ -851,7 +855,9 @@ class TimeseriesList( list ):
             elif potential is None:
                 potential=series
             else:
-                raise RuntimeError('Ambiguous time series requested - multiple solution types')
+                ambiguous=True
+        if ambiguous:
+            raise RuntimeError('Ambiguous time series requested - multiple solution types')
         if not potential:
             raise RuntimeError('No time series found for requested station '+code)
         potential.setDateRange(before=before,after=after)
