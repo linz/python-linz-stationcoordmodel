@@ -41,7 +41,7 @@ class StationCoordModelUpdater( object ):
         self.testonly=testonly
         self.verbose=verbose
         self.read_config(cfgfile,options)
-        self.backedup=[]
+        self.backedup=set()
 
     def read_config(self,cfgfile,options=None):
         config={x:None for x in '''
@@ -118,7 +118,6 @@ class StationCoordModelUpdater( object ):
         if self.model.changed():
             self.backupModel();
         self.model.save(updateAvailability=self.update_availability)
-        self.statusText.setText('Model saved')
 
     def loadModel(self,code):
         filename=self.model_file.replace('{code}',code)
