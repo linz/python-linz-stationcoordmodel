@@ -925,7 +925,7 @@ class Model( object ):
             as the current model
         '''
         xml=self.toXmlElement()
-        copy=model(station=self.station,filename=filename,loadfile=False)
+        copy=Model(station=self.station,filename=filename,loadfile=False)
         copy.loadFromXml(xml,'copy')
         return copy
 
@@ -1182,7 +1182,7 @@ class Model( object ):
             self.components.remove(component)
             component.model=None
 
-    def calc( self, dates, enu=True ):
+    def calc( self, dates, enu=True, excludeTypes=None ):
         '''
         Calculate the model at one or more dates. 
 
@@ -1199,6 +1199,14 @@ class Model( object ):
         dates=days_array(dates)
         value=np.zeros((len(dates),3))
         for m in self.components:
+            skip_component=False
+            if excludeTypes:
+                if not isinstance(excludeTypes,list):
+                    excludeTypes=[excludeTypes]
+                for t in excludeTypes:
+                    if isinstance(m,t):
+                        skip_component=True
+                        break
             if m.enabled():
                 value += m.calc(dates)
         if not enu:

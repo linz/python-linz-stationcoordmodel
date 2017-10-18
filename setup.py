@@ -101,6 +101,7 @@ setup(
             'calc_refstation_coords=LINZ.calc_refstation_coords:main',
             'station_coord_model=LINZ.StationCoordinateModel:main',
             'spm_editor=LINZ.spm_editor:main',
+            'spm_update=LINZ.spm_update:main',
             'spm_clean=LINZ.StationCoordinateModel:clean',
             'analyse_cors=LINZ.CORS_Analyst:main',
             'report_datum_status=LINZ.report_datum_status:main',
