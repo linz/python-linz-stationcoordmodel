@@ -204,6 +204,8 @@ class StationCoordModelUpdater( object ):
     def changeSummary( self ):
         dates, change, meanChange=self.calcChange()
         lon,lat,h=GRS80.geodetic(self.model.calc(dates[-1],enu=False))
+        if lon < 0:
+            lon += 360.0
         return dict(
             station=self.model.station,
             longitude=lon,
