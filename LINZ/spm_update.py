@@ -22,6 +22,7 @@ import pandas as pd
 
 from . import StationCoordinateModel as spm
 from .CORS_Timeseries import TimeseriesList, robustStandardError
+from LINZ.Geodetic.Ellipsoid import GRS80
 
 default_model_file='stations/{code}.xml'
 default_model_backup_file=None # stations/{code}.xml.{fdatetime}
@@ -30,7 +31,7 @@ default_timeseries_file='timeseries/{code}_igs08_xyz.dat'
 
 class StationCoordModelUpdater( object ):
 
-    summary_cols='''station 
+    summary_cols='''station longitude latitude
                    start_date end_date dh dv
                    end_de end_dn end_du 
                    end_mean_de end_mean_dn end_mean_du
@@ -202,8 +203,11 @@ class StationCoordModelUpdater( object ):
 
     def changeSummary( self ):
         dates, change, meanChange=self.calcChange()
+        lon,lat,h=GRS80.geodetic(self.model.calc(dates[-1],enu=False))
         return dict(
             station=self.model.station,
+            longitude=lon,
+            latitude=lat,
             start_date=dates[0],
             end_date=dates[-1],
             dh=np.max(np.hypot(change[:,0],change[:,1])),
