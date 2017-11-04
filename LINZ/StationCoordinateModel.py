@@ -375,7 +375,7 @@ class date_parameter( parameter ):
 
 class base_function( object ):
     '''
-    Abstract ase class for the functions (components) used to build a coordinate prediction model
+    Abstract base class for the functions (components) used to build a coordinate prediction model
 
     Each derived class implements a function calc for calculating the component at a given time, 
     and defines the parameters used by the component.
@@ -510,7 +510,7 @@ class base_function( object ):
     @staticmethod
     def fromXmlElement( model, element ):
         '''
-        Static function to reconstruct a componet from an XmlElement.
+        Static function to reconstruct a component from an XmlElement.
         '''
         classname = element.get('type','')
         if not classname:
@@ -536,6 +536,14 @@ class base_function( object ):
                     p.loadXmlElement(pelement)
                     break
         return component
+
+    def copyTo( self, model ):
+        '''
+        Create a copy of the element to be attached to the specified model
+        '''
+        copy=base_function.fromXmlElement( model, self.xmlElement() )
+        model.addComponent(copy)
+        return copy
 
     def paramValues( self ):
         '''
@@ -1100,7 +1108,8 @@ class Model( object ):
             try:
                 xyz[i]=float(spm.get(axis,''))
             except:
-                raise ValueError(source+' does not define an '+axis+' value')
+                xyz=None
+                break
         self.setStation(code,xyz)
 
         components=[]

@@ -338,6 +338,7 @@ class AppForm(QMainWindow):
 
     def __init__(self, cfgfile=None, options=None, parent=None):
         QMainWindow.__init__(self, parent=None)
+        self.catalog=None
         self.read_config(cfgfile,options)
         self.backedup=set()
         self.model=None
@@ -368,7 +369,8 @@ class AppForm(QMainWindow):
                 robust_se_percentile 
                 outlier_reject_level
                 outlier_test_range
-                set_model_start_date'''.split()}
+                set_model_start_date
+                catalog'''.split()}
         if cfgfile and os.path.exists(cfgfile):
             with open(cfgfile) as cfg:
                 for l in cfg:
@@ -404,6 +406,10 @@ class AppForm(QMainWindow):
         self.solutiontypes=solutiontypes
         self.timeseries_list=TimeseriesList(self.timeseries_file,solutiontypes or None,
               after=config.get('after'),before=config.get('before'))
+        catalog_file=config.get('catalog')
+        if catalog_file is None:
+            catalog_file=re.sub(r'(\.cfg)?$','.catalog',cfgfile,re.I)
+        self.loadCatalog(catalog_file)
 
     def savePlot(self):
         file_choices = "PNG file (*.png)"
@@ -530,6 +536,39 @@ class AppForm(QMainWindow):
         modelFile = self.modelFile(code)
         self.loadModel(modelFile,code)
 
+    def loadCatalog(self,catalogFile):
+        try:
+            loadfile=os.path.exists(catalogFile)
+            self.catalog=spm.Model(station='____',filename=catalogFile,loadfile=loadfile)
+        except RuntimeError as ex:
+            self.statusText.setText(ex.message)
+            self.catalog=None
+
+    def removeFromCatalog( self, component ):
+        catalog=self.catalog
+        if catalog is not None and component in catalog.components:
+            catalog.removeComponent(component)
+            catalog.save()
+
+    def addComponentToCatalog( self ):
+        component=self.params.component
+        if self.catalog is None:
+            self.statusText.setText('Catalog not defined - cannot add component to it')
+            return
+        if type(component) not in self.editableTypes:
+            self.statusText.setText('Cannot save {0} type component in catalog'.format(type(component).__name__))
+            return
+        if not component.eventName():
+            self.statusText.setText('Saved components must have an event name')
+            return
+        catalog=self.catalog
+        for c in catalog.components:
+            if c.eventName() == component.eventName():
+                catalog.removeComponent(c)
+        component.copyTo(catalog)
+        catalog.save()
+        self.populateComponentTypes()
+
     def loadModel(self,modelFile,code=None):
         loadfile=os.path.exists(modelFile)
         try:
@@ -633,7 +672,7 @@ class AppForm(QMainWindow):
         if not self.model:
             return
         dates,obs,useobs = self.model.getObs()
-        if dates==None or obs==None or len(obs) == 0:
+        if dates is None or obs is None or len(obs) == 0:
             return
         plotdays = self.timeasdays.isChecked()
         days=spm.days_array(dates)
@@ -793,8 +832,11 @@ class AppForm(QMainWindow):
 
     def addComponent( self ):
         ctype = self.addComponentType.itemData(self.addComponentType.currentIndex()).toPyObject()
-        cdate = self.addComponentDate.dateTime().toPyDateTime()
-        component=ctype(self.model,cdate)
+        if type(ctype) is type:
+            cdate = self.addComponentDate.dateTime().toPyDateTime()
+            component=ctype(self.model,cdate)
+        else:
+            component=ctype.copyTo(self.model)
         self.components.addComponent(component)
         self.recalculate()
         self.selectComponent(component)
@@ -811,6 +853,15 @@ class AppForm(QMainWindow):
         row=self.components.row(component)
         if row >= 0:
             self.componentTable.selectRow(row)
+
+    def populateComponentTypes( self ):
+        self.addComponentType.clear()
+        for t in self.editableTypes:
+            self.addComponentType.addItem(t.__name__,t)
+        if self.catalog is not None:
+            for c in self.catalog.components:
+                if type(c) in self.editableTypes:
+                    self.addComponentType.addItem(c.eventName(),c)
 
     def createMainFrame(self):
         self.main_frame = QWidget()
@@ -857,11 +908,12 @@ class AppForm(QMainWindow):
         self.undoButton.setDefaultAction(self.undoAction)
         self.redoButton=QToolButton(self)
         self.redoButton.setDefaultAction(self.redoAction)
+        self.catalogButton=QToolButton(self)
+        self.catalogButton.setDefaultAction(self.catalogAction)
         self.removeButton=QPushButton('Remove',self)
         self.removeButton.setEnabled(False)
         self.addComponentType=QComboBox(self)
-        for t in self.editableTypes:
-            self.addComponentType.addItem(t.__name__,t)
+        self.populateComponentTypes()
         self.addComponentDate=QDateTimeEdit(self);
         self.addButton=QPushButton('Add',self)
         self.eventName=QLineEdit(self)
@@ -912,6 +964,7 @@ class AppForm(QMainWindow):
         bbox2.addWidget(self.fitAllButton)
         bbox2.addWidget(self.undoButton)
         bbox2.addWidget(self.redoButton)
+        bbox2.addWidget(self.catalogButton)
 
         vbox3 = QVBoxLayout()
         vbox3.addLayout(nmbox)
@@ -954,6 +1007,8 @@ class AppForm(QMainWindow):
         self.redoAction = self.createAction("&Redo", slot=self.redo, 
             shortcut="Ctrl+R", tip="Redo the last change")
         self.redoAction.setEnabled(False)
+        self.catalogAction = self.createAction("Catalog", slot=self.addComponentToCatalog, 
+            tip="Add current component to catalog")
 
         self.fitAction = self.createAction("&Fit", slot=self.fitComponent,
             tip="Fit selected components and parameters")
