@@ -1,3 +1,13 @@
+python-linz-stationcoordmodel (1.28.0-1) xenial; urgency=medium
+
+  * Adding spm_update function
+  * Adding lat/lon to summary output file
+  * Wrapping negative longitudes
+  * Bug fix
+  * Adding catalog to coordinate model editor
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Sun, 05 Nov 2017 18:46:39 +1300
+
 python-linz-stationcoordmodel (1.27.0-1) xenial; urgency=medium
 
   * Fixing handling of multiple time series types
