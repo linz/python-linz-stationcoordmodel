@@ -192,9 +192,13 @@ class Timeseries( object ):
             self._loaded=False
 
     def xyz0( self ):
+        if self._xyz0 is None:
+            self._load()
         return self._xyz0
 
     def xyzenu( self ):
+        if self._xyzenu is None:
+            self._load()
         return self._xyzenu
 
     def code( self ):
@@ -706,7 +710,7 @@ class FileTimeseries( Timeseries ):
         return series
 
 
-    def __init__( self, filename, code=None, solutiontype=None, xyz0=None, transform=None, after=None, before=None, normalize=False ):
+    def __init__( self, filename, code=None, solutiontype='default', xyz0=None, transform=None, after=None, before=None, normalize=False ):
         Timeseries.__init__(self,code,solutiontype=solutiontype,xyz0=xyz0,transform=transform,after=after,before=before,normalize=normalize)
         self._filename=filename
 
