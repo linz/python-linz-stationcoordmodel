@@ -297,16 +297,18 @@ def main():
         auto_reject_obs=args.auto_reject
         )
 
-    codes=[c.upper() for c in args.codes]
-    for c in codes:
-        if not re.match(r'^\w\w\w\w$',c):
-            print("Invalid station code {0}".format(c))
-            sys.exit()
+    codes=[]
+    if args.codes is not None:
+        codes=[c.upper() for c in args.codes]
+        for c in codes:
+            if not re.match(r'^\w\w\w\w$',c):
+                print("Invalid station code {0}".format(c))
+                sys.exit()
 
     if args.config_file:
         cfgfile=args.config_file
 
-    updater=StationCoordModelUpdater(cfg,options)
+    updater=StationCoordModelUpdater(cfgfile,options)
     summary=updater.update(codes,calcSummary=args.summary_file is not None)
     if summary is not None and args.summary_file:
         summary.to_csv(args.summary_file,index=False,float_format='%.4f',date_format='%Y-%m-%d')
