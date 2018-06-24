@@ -308,7 +308,7 @@ def main():
     if args.config_file:
         cfgfile=args.config_file
 
-    updater=StationCoordModelUpdater(cfgfile,options)
+    updater=StationCoordModelUpdater(cfgfile,options,verbose=args.verbose)
     summary=updater.update(codes,calcSummary=args.summary_file is not None)
     if summary is not None and args.summary_file:
         summary.to_csv(args.summary_file,index=False,float_format='%.4f',date_format='%Y-%m-%d')
