@@ -165,10 +165,11 @@ class CORS_Analyst( object ):
 
     def compileOffsetStats( self, code, stats, teststat, levels, testtype ):
         results={}
+        fixnan=lambda f: 0.0 if np.isnan(f) else f
         for m in 'count mean std median min max'.split():
             mloc='50%' if m == 'median' else m
             mstats=stats.loc[mloc]
-            results[m]=[mstats.e,mstats.n,mstats.u]
+            results[m]=[fixnan(mstats.e),fixnan(mstats.n),fixnan(mstats.u)]
         results['count']=results['count'][0]
         teststats=results[teststat]
         testh=np.hypot(teststats[0],teststats[1])
