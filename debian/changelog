@@ -1,3 +1,13 @@
+python-linz-stationcoordmodel (1.30.0-1) xenial; urgency=medium
+
+  * Fixing error with returning values before loading data and solution types set to None
+  * Fixing errors in spm_update
+  * Handling verbose parameter
+  * Removing NaN as not handled by datum_integrity web page
+  * Allow CORS_Analyst to run without station coordinate model
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 23 Jul 2018 10:00:11 +1200
+
 python-linz-stationcoordmodel (1.29.0-1) xenial; urgency=medium
 
   * Adding catalog to coordinate model editor
