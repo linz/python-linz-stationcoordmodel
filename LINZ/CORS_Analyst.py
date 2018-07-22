@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
 
+from LINZ.Geodetic import GDB
 from .StationCoordinateModel import Model as StationCoordinateModel
 
 from . import CORS_Timeseries
@@ -71,37 +72,47 @@ class CORS_Analyst( object ):
         self.deformationModelVersion=self.gdbCalculator.deformationModelVersion()
 
     def gdbTimeseries( self, code, dates, xyz0=None ):
+        if not GDB.get(code):
+            raise RuntimeError("Cannot get GDB data for {0}".format(code))
         gdbts=self.gdbCalculator.get(code,xyz0=xyz0,index=dates)
         return gdbts
 
-    def scmTimeseries( self, model, dates ):
+    def scmTimeseries( self, model, dates, xyz0=None ):
+        if model is None:
+            return None
         spmxyz=model.calc(dates.to_pydatetime(),enu=False)
         code=model.station
-        xyz0=model.xyz
         scmts=CORS_Timeseries.Timeseries(code,solutiontype='scm',dates=dates,xyz=spmxyz,xyz0=xyz0)
         return scmts
 
     def getStationData( self, code ):
         # Load the time series
+
         ts=CORS_Timeseries.SqliteTimeseries(self._tsdb,code,solutiontype=self._tssolutiontype)
 
-        # Load the station coordinate model corresponding to the station
-        scmfile=self._scmpath.replace('{code}',code)
-        model=StationCoordinateModel(filename=scmfile)
+        # Define a reference coordinate for the station to apply to the time series
+        # (so that we get compatible xyz offsets)
 
-        # Get the reference coordinate used by the model and apply to the time series
-        # (so that we get compatible xyz errors)
-
-        xyz0=model.xyz
-        ts.setXyzTransform(xyz0=xyz0)
         dates=ts.dates()
-
-        # Set up a time series of based on the station coordinate model
-        spmts=self.scmTimeseries( model, dates )
+        if len(dates) == 0:
+            raise RuntimeError("No timeseries data found for code {0}".format(code))
 
         # Set up a time series based on the GDB official coordinate and the deformation
         # model
-        gdbts=self.gdbTimeseries( code,dates,xyz0)
+        gdbts=self.gdbTimeseries( code,dates )
+        xyz0=gdbts.getData(enu=False,index=[dates[-1]])
+        xyz0=np.array([xyz0.x,xyz0.y,xyz0.z]).flatten()
+        ts.setXyzTransform(xyz0=xyz0)
+        gdbts.setXyzTransform(xyz0=xyz0)
+
+        # Set up a time series of based on the station coordinate model
+        spmts=None
+        model=None
+        if self._scmpath != 'none':
+            # Load the station coordinate model corresponding to the station
+            scmfile=self._scmpath.replace('{code}',code)
+            model=StationCoordinateModel(filename=scmfile)
+            spmts=self.scmTimeseries( model, dates, xyz0 )
 
         return StationData(code,ts,model,spmts,gdbts)
 
@@ -115,8 +126,11 @@ class CORS_Analyst( object ):
         select=dates > refdate
         obsts=stnData.timeseries.getData()[select]
         gdbts=stnData.gdbTimeseries.getData()[select]
-        scmts=stnData.scmTimeseries.getData()[select]
-        return StationOffsetStats(calcdate,(obsts-gdbts).describe(),(obsts-scmts).describe())
+        scmdiff=None
+        if stnData.scmTimeseries is not None:
+            scmts=stnData.scmTimeseries.getData()[select]
+            scmdiff=(obsts-scmts).describe()
+        return StationOffsetStats(calcdate,(obsts-gdbts).describe(),scmdiff)
 
     def writeTimeseriesCSV( self, code, tsdata, csv_cfg_type ):
         results_dir=self._cfg.get(self._configgroup,'result_path')
@@ -137,6 +151,8 @@ class CORS_Analyst( object ):
                 json.encoder.FLOAT_REPR=oldencoder
 
     def trimmedModelTimeseries( self, tsdata, precision ):
+        if tsdata is None:
+            return None
         enu=np.vstack((tsdata.e,tsdata.n,tsdata.u)).T
         timevar=tsdata.index.to_pydatetime()
         reftime=timevar[0]
@@ -202,10 +218,11 @@ class CORS_Analyst( object ):
         stnresults={
             "code": code,
             "offset_test_date": offsets.date.strftime("%Y-%m-%d"),
-            "gdb_offset": self.compileOffsetStats(code,offsets.gdbOffset,self._teststat,self._gdbwarning,'GDB coordinate'),
-            "scm_offset": self.compileOffsetStats(code,offsets.scmOffset,self._teststat,self._scmwarning,'station coordinate model'),
-            "scm_version": stndata.stationCoordModel.versiondate.strftime("%Y-%m-%d %H:%M:%S"),
-            }
+            "gdb_offset": self.compileOffsetStats(code,offsets.gdbOffset,self._teststat,self._gdbwarning,'GDB coordinate')
+             }
+        if stndata.stationCoordModel is not None:
+            stnresults["scm_offset"]=self.compileOffsetStats(code,offsets.scmOffset,self._teststat,self._scmwarning,'station coordinate model')
+            stnresults["scm_version"]=stndata.stationCoordModel.versiondate.strftime("%Y-%m-%d %H:%M:%S")
         
         if self._writecsv:
             # Write the CSV file options
@@ -230,10 +247,12 @@ class CORS_Analyst( object ):
                 dates=pd.date_range(startdate,enddate,freq='d')
                 xyz0=ts.xyz0()
                 gdbmodel=self.gdbTimeseries(code,dates,xyz0).getData()
-                scmmodel=self.scmTimeseries(stndata.stationCoordModel,dates).getData()
+                scmmodel=self.scmTimeseries(stndata.stationCoordModel,dates)
             else:
                 gdbmodel=stndata.gdbTimeseries.getData()
-                scmmodel=stndata.scmTimeseries.getData()
+                scmmodel=stndata.scmTimeseries
+            if scmmodel is not None:
+                scmmodel=scmmodel.getData()
 
             # Calculate the time series
 
@@ -243,14 +262,16 @@ class CORS_Analyst( object ):
 
             if combinets:
                 gdbmodel.columns=('gdb_e','gdb_n','gdb_u')
-                scmmodel.columns=('scm_e','scm_n','scm_u')
                 tsdata=tsdata.join(gdbmodel,how='outer')
-                tsdata=tsdata.join(scmmodel,how='outer')
+                if scmmodel is not None:
+                    scmmodel.columns=('scm_e','scm_n','scm_u')
+                    tsdata=tsdata.join(scmmodel,how='outer')
                 self.writeTimeseriesCSV( code, tsdata, 'timeseries_csv' )
             else:
                 self.writeTimeseriesCSV( code, tsdata, 'timeseries_csv' )
                 self.writeTimeseriesCSV(code,gdbmodel,'gdb_timeseries_csv')
-                self.writeTimeseriesCSV(code,scmmodel,'scm_timeseries_csv')
+                if scmmodel is not None:
+                    self.writeTimeseriesCSV(code,scmmodel,'scm_timeseries_csv')
 
         return stnresults
 
