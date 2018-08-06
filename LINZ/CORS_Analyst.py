@@ -151,6 +151,9 @@ class CORS_Analyst( object ):
                 json.encoder.FLOAT_REPR=oldencoder
 
     def trimmedModelTimeseries( self, tsdata, precision ):
+        # Remove redundant data for plotting model time series based
+        # Removes data points which are on line between included points
+        # to a given precision.
         if tsdata is None:
             return None
         enu=np.vstack((tsdata.e,tsdata.n,tsdata.u)).T
@@ -247,7 +250,7 @@ class CORS_Analyst( object ):
                 dates=pd.date_range(startdate,enddate,freq='d')
                 xyz0=ts.xyz0()
                 gdbmodel=self.gdbTimeseries(code,dates,xyz0).getData()
-                scmmodel=self.scmTimeseries(stndata.stationCoordModel,dates)
+                scmmodel=self.scmTimeseries(stndata.stationCoordModel,dates,xyz0)
             else:
                 gdbmodel=stndata.gdbTimeseries.getData()
                 scmmodel=stndata.scmTimeseries
