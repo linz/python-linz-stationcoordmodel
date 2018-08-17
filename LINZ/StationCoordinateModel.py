@@ -1307,6 +1307,7 @@ class Model( object ):
         self.setExcludedObs()
         if setdate:
             self.startdate=self.dates[0]
+            self.enddate=self.dates[-1]
 
 
     def getObs( self ):
