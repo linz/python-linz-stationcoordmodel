@@ -1089,14 +1089,6 @@ class Model( object ):
         vrdt=root.get('version_date')
         if vrdt:
             self.versiondate=datetime.strptime(vrdt,datetimeformat)
-
-        vrdt=root.get('start_date')
-        if vrdt:
-            self.startdate=datetime.strptime(vrdt,datetimeformat)
-
-        vrdt=root.get('end_date')
-        if vrdt:
-            self.enddate=datetime.strptime(vrdt,datetimeformat)
             
         spm=root.find(cpm_tag)
         rfdt=spm.get('ref_date')
@@ -1111,6 +1103,14 @@ class Model( object ):
                 xyz=None
                 break
         self.setStation(code,xyz)
+
+        vrdt=root.get('start_date')
+        if vrdt:
+            self.startdate=datetime.strptime(vrdt,datetimeformat)
+
+        vrdt=root.get('end_date')
+        if vrdt:
+            self.enddate=datetime.strptime(vrdt,datetimeformat)
 
         components=[]
         comproot=spm.find('components')
