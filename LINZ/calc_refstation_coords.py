@@ -14,6 +14,8 @@ from datetime import datetime,date
 
 from .StationCoordinateModel import Model as spm
 
+# Note: This code needs to be refactored! Structure has become very ugly!
+
 _description='Script to compare NZGD2000 coordinates with station time series'
 _epilog='''
 
@@ -24,6 +26,8 @@ is 'gdb' then the current coordinates will be downloaded from the
 online geodetic database.
 
 '''
+model_itrf='ITRF2008'
+default_gx_error=['0.5','1.0']
 
 
 def main():
@@ -33,8 +37,8 @@ def main():
     parser.add_argument('gdb_file',default='gdb_coords.txt',help="Name of gdb file input file, or 'gdb' to use online database, or 'none' to not compare with gdb")
     parser.add_argument('check_file',nargs='?',default='coord_differences.csv',help="Output csv file of coordinate comparisons")
     parser.add_argument('-u','--update-csv-file',help="Name of gdb coordinate upload file (default none)")
-    parser.add_argument('-n','--snap-file',help="Name of snap data file (default none)")
-    parser.add_argument('--snap-gx-error',nargs=2,help="Snap horizontal and vertical mm error")
+    parser.add_argument('-x','--snap-gx-file',help="Name of snap data file (default none)")
+    parser.add_argument('-c','--snap-crd-file',help="Name of snap coordinate file (default none)")
     parser.add_argument('-f','--def-dir',help="Deformation model base dir (contains tools and model)")
     parser.add_argument('-m','--model-dir',help="Directory containing deformation model")
     parser.add_argument('-s','--stn-dir',default='stations',help="Directory containing SPM xml definitions")
@@ -42,27 +46,25 @@ def main():
     parser.add_argument('-a','--all-marks',action='store_true',help="Output coord information for all marks including not in gdb")
     parser.add_argument('-e','--extend-dates',action='store_true',help="Extrapolate models before first or after last dates")
     parser.add_argument('-i','--itrf-only',action='store_true',help="Calculate ITRF coordinates but not GDB")
+    parser.add_argument('--snap-gx-error',nargs=2,type=float,
+                        default=default_gx_error,help="Snap horizontal and vertical mm error")
+    parser.add_argument('--snap-gx-refframe',default=model_itrf,help="Snap horizontal and vertical mm error")
 
     args=parser.parse_args()
 
     gdbfile=args.gdb_file
     chkfile=args.check_file
     updfile=args.update_csv_file
-    snapfile=args.snap_file
+    snapgxfile=args.snap_gx_file
+    snapgxrf=args.snap_gx_refframe
+    snapcrdfile=args.snap_crd_file
     stndir=args.stn_dir
     defdir=args.def_dir
     allmarks=args.all_marks
     alldates=args.extend_dates
     itrfonly=args.itrf_only
-    gx_error=['0.5','1.0']
-    if args.snap_gx_error:
-        gx_error=[]
-        for a in args.snap_gx_error:
-            if not re.match(r'\d(\.\d+)?$',a):
-                raise RuntimeError('Invalid snap_gx_error argument {0}'.format(a))
-            gx_error.append(a)
-    
-    mdlitrf='ITRF2008'
+    gx_error=args.snap_gx_error
+
     mdldir=args.model_dir or (defdir+'/model' if defdir else 'model')
 
     if args.calc_date is not None:
@@ -74,7 +76,7 @@ def main():
     from LINZ.Geodetic.Ellipsoid import GRS80
     from LINZ.Geodetic.ITRF import Transformation
 
-    itrf_tfm=Transformation(from_itrf=mdlitrf,to_itrf='ITRF96')
+    itrf_tfm=Transformation(from_itrf=model_itrf,to_itrf='ITRF96')
 
 
     calcgdb=not itrfonly
@@ -117,7 +119,7 @@ def main():
     csv=None
     if chkfile and chkfile != 'none':
         csv=open(chkfile,'w')
-        itrfc=mdlitrf.lower()
+        itrfc=model_itrf.lower()
         columns=[
             'code',
             'scm_version',
@@ -153,15 +155,21 @@ def main():
         logf=open(logfile,'w')
 
     datf=None
-    if snapfile:
-        datf=open(snapfile,'w')
+    if snapgxfile:
+        datf=open(snapgxfile,'w')
         datf.write("CORS reference stations coordinates\n")
         datf.write("\n")
         datf.write("#date {0:%Y-%m-%d}\n".format(calcDate))
         datf.write("#gx_enu_error {0} {0} {1} mm\n".format(*gx_error))
-        datf.write("#reference_frame {0}\n".format(mdlitrf))
-        datf.write("#classification spm_version\n".format(mdlitrf))
-        datf.write("#data gx spm_version value no_heights\n\n".format(mdlitrf))
+        datf.write("#reference_frame {0}\n".format(snapgxrf))
+        datf.write("#classify gx source scm\n".format(model_itrf))
+        datf.write("#classification scm_version\n".format(model_itrf))
+        datf.write("#data gx scm_version value no_heights\n\n".format(model_itrf))
+
+    crdf=None
+    if snapcrdfile:
+        neednz2k=True
+        crdf=open(snapcrdfile,'w')
 
     if neednz2k:
         defmodel=DefModel.Model(mdldir)
@@ -176,6 +184,11 @@ def main():
         logf.write("GDB update file written to: {0}\n".format(updfile))
         logf.write("Coordinate calculation date: {0:%Y-%m-%d %H:%M:%S}\n".format(calcDate))
         logf.write("GDB coordinates: {0}\n".format(gdbfile))
+
+    if crdf:
+        crdf.write("PositioNZ coordinates calculated at {0:%Y-%m-%d %H:%M:%S}\n".format(calcDate))
+        crdf.write("NZGD2000_{0}\n".format(defmodel.version()))
+        crdf.write("options no_geoid ellipsoidal_heights degrees\n\n")
 
     codes=[]
     for f in os.listdir(stndir):
@@ -250,10 +263,14 @@ def main():
             if datf:
                 datf.write("{0} {1:SCM_%Y%m%d%H%M%S} {2:.4f} {3:.4f} {4:.4f}\n".format(
                     code.upper(),m.versiondate,xyz08[0],xyz08[1],xyz08[2]))
+
+            if crdf:
+                crdf.write("{0} {1:.10f} {2:.10f} {3:.4f} {0}\n".format(code.upper(),
+                    llhnz2k[1],llhnz2k[0],llhnz2k[2]))
         except:
             print(sys.exc_info()[1])
 
-    for f in (csv, csvu, logf, datf ):
+    for f in (csv, csvu, logf, datf, crdf ):
         if f is not None:
             f.close()
 
