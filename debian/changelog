@@ -1,3 +1,11 @@
+python-linz-stationcoordmodel (1.31.0-1) xenial; urgency=medium
+
+  * Adding setting end date to model xml file (date of last obs)
+  * Adding SNAP data file output to calc_refstation_coords
+  * Adding SNAP coordinate file output to calc_refstation-coords
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 21 Aug 2018 07:21:53 +1200
+
 python-linz-stationcoordmodel (1.30.1-1) xenial; urgency=medium
 
   * Fixing offset in station coord model ouput csv file
