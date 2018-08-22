@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.32.0-1) xenial; urgency=medium
+
+  * Adding option for ITRF snap coordinate file
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 23 Aug 2018 09:40:40 +1200
+
 python-linz-stationcoordmodel (1.31.0-1) xenial; urgency=medium
 
   * Adding setting end date to model xml file (date of last obs)
