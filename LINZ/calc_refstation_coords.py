@@ -48,7 +48,8 @@ def main():
     parser.add_argument('-i','--itrf-only',action='store_true',help="Calculate ITRF coordinates but not GDB")
     parser.add_argument('--snap-gx-error',nargs=2,type=float,
                         default=default_gx_error,help="Snap horizontal and vertical mm error")
-    parser.add_argument('--snap-gx-refframe',default=model_itrf,help="Snap horizontal and vertical mm error")
+    parser.add_argument('--snap-gx-refframe',default=model_itrf,help="Snap GX observation reference frame code")
+    parser.add_argument('--snap-crd-use-itrf',action='store_true',help="Snap GX observation reference frame code")
 
     args=parser.parse_args()
 
@@ -64,6 +65,7 @@ def main():
     alldates=args.extend_dates
     itrfonly=args.itrf_only
     gx_error=args.snap_gx_error
+    crd_itrf=args.snap_crd_use_itrf
 
     mdldir=args.model_dir or (defdir+'/model' if defdir else 'model')
 
@@ -168,7 +170,7 @@ def main():
 
     crdf=None
     if snapcrdfile:
-        neednz2k=True
+        neednz2k=not crd_itrf
         crdf=open(snapcrdfile,'w')
 
     if neednz2k:
@@ -187,8 +189,11 @@ def main():
 
     if crdf:
         crdf.write("PositioNZ coordinates calculated at {0:%Y-%m-%d %H:%M:%S}\n".format(calcDate))
-        crdf.write("NZGD2000_{0}\n".format(defmodel.version()))
-        crdf.write("options no_geoid ellipsoidal_heights degrees\n\n")
+        if crd_itrf:
+            crdf.write("{0}@{1:%Y%m%d}\n".format(model_itrf,calcDate))
+        else:
+            crdf.write("NZGD2000_{0}\n".format(defmodel.version()))
+        crdf.write("options no_geoid ellipsoidal_heights degrees c=scmversion\n\n")
 
     codes=[]
     for f in os.listdir(stndir):
@@ -265,8 +270,9 @@ def main():
                     code.upper(),m.versiondate,xyz08[0],xyz08[1],xyz08[2]))
 
             if crdf:
-                crdf.write("{0} {1:.10f} {2:.10f} {3:.4f} {0}\n".format(code.upper(),
-                    llhnz2k[1],llhnz2k[0],llhnz2k[2]))
+                snapcrd=llh08 if crd_itrf else llhnz2k
+                crdf.write("{0} {1:.10f} {2:.10f} {3:.4f} {4:%Y%m%d} {0}\n".format(code.upper(),
+                    snapcrd[1],snapcrd[0],snapcrd[2],m.versiondate))
         except:
             print(sys.exc_info()[1])
 
