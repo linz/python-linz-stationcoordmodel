@@ -23,6 +23,7 @@ from . import GDB_Timeseries
 
 StationData=namedtuple('StationData','code timeseries stationCoordModel scmTimeseries gdbTimeseries')
 StationOffsetStats=namedtuple('StationOffsetStats','date gdbOffset scmOffset')
+RefCoordinateDate=datetime(2018,1,1)
 
 class CORS_Analyst( object ):
 
@@ -71,10 +72,10 @@ class CORS_Analyst( object ):
         self.gdbCalculator=GDB_Timeseries.GDB_Timeseries_Calculator( path )
         self.deformationModelVersion=self.gdbCalculator.deformationModelVersion()
 
-    def gdbTimeseries( self, code, dates, xyz0=None ):
+    def gdbTimeseries( self, code, dates=None, xyz0=None, xyz0Date=None ):
         if not GDB.get(code):
             raise RuntimeError("Cannot get GDB data for {0}".format(code))
-        gdbts=self.gdbCalculator.get(code,xyz0=xyz0,index=dates)
+        gdbts=self.gdbCalculator.get(code,xyz0=xyz0,index=dates,xyz0Date=xyz0Date)
         return gdbts
 
     def scmTimeseries( self, model, dates, xyz0=None ):
@@ -97,13 +98,12 @@ class CORS_Analyst( object ):
         if len(dates) == 0:
             raise RuntimeError("No timeseries data found for code {0}".format(code))
 
-        # Set up a time series based on the GDB official coordinate and the deformation
-        # model
-        gdbts=self.gdbTimeseries( code,dates )
-        xyz0=gdbts.getData(enu=False,index=[dates[-1]])
-        xyz0=np.array([xyz0.x,xyz0.y,xyz0.z]).flatten()
+        # Create the GDB coordinate time series, and use it to set the reference
+        # coordinate.
+
+        gdbts=self.gdbTimeseries( code,dates,xyz0Date=RefCoordinateDate )
+        xyz0=gdbts.xyz0()
         ts.setXyzTransform(xyz0=xyz0)
-        gdbts.setXyzTransform(xyz0=xyz0)
 
         # Set up a time series of based on the station coordinate model
         spmts=None

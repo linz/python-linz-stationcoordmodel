@@ -72,12 +72,16 @@ class GDB_Timeseries_Calculator( object ):
         '''
         return self.itrf
 
-    def getMarkData( self, code, index=None, fillDays=False, after=None, before=None, increment=1.0,xyz0=None ):
+    def getMarkData( self, code, index=None, fillDays=False, after=None, before=None, increment=1.0,xyz0=None, xyz0Date=None ):
         '''
         Get the time series for a geodetic mark.  Retrieves the official coordinates, calculates the
         deformation model at the required dates, and constructs a timeseries from them.
 
-        Can supply a list of dates as an index, a from date, to date, and increment, or use the default dates.
+        Can supply a list of dates as an index, a from date, to date, and increment, 
+        or use the default dates.
+
+        The reference coordinate can be explicitly supplied, or calculated for a reference date. 
+        Otherwise the NZGD2000 XYZ value will be used.
         '''
 
         if self._deformationModelDirectory is None:
@@ -90,12 +94,14 @@ class GDB_Timeseries_Calculator( object ):
             raise RuntimeError('GDB timeseries for '+code+' not available - mark not in GDB')
         lon,lat,hgt=markdata.official_coordinate
         markxyz=GRS80.xyz(lon,lat,hgt)
+        function=lambda d: GRS80.xyz(self._itrfTransformation(lon,lat,hgt,d))
+        if xyz0 is None and xyz0Date is not None:
+            xyz0=function(xyz0Date)
         if xyz0 is None:
             xyz0=markxyz
-        function=lambda d: GRS80.xyz(self._itrfTransformation(lon,lat,hgt,d))
         gdbts=CORS_Timeseries.FunctionTimeseries(function,code=code,solutiontype='gdb',index=index,fillDays=fillDays,after=after,before=before,xyz0=xyz0)
         return GDB_Timeseries_Calculator.StationData(code,markxyz,markdata,gdbts)
 
-    def get( self, code, index=None, fillDays=False, after=datetime(1999,12,31), before=None, increment=1.0,xyz0=None ):
-        data=self.getMarkData(code,index=index,fillDays=fillDays,before=before,after=after,increment=increment,xyz0=xyz0)
+    def get( self, code, index=None, fillDays=False, after=datetime(1999,12,31), before=None, increment=1.0,xyz0=None,xyz0Date=None ):
+        data=self.getMarkData(code,index=index,fillDays=fillDays,before=before,after=after,increment=increment,xyz0=xyz0,xyz0Date=xyz0Date)
         return data.timeseries

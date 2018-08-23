@@ -165,8 +165,9 @@ def main():
         datf.write("#gx_enu_error {0} {0} {1} mm\n".format(*gx_error))
         datf.write("#reference_frame {0}\n".format(snapgxrf))
         datf.write("#classify gx source scm\n".format(model_itrf))
-        datf.write("#classification scm_version\n".format(model_itrf))
-        datf.write("#data gx scm_version value no_heights\n\n".format(model_itrf))
+        datf.write("#classification scmversion\n".format(model_itrf))
+        datf.write("#classification scmlastobs\n".format(model_itrf))
+        datf.write("#data gx scmversion scmlastobs value no_heights\n\n".format(model_itrf))
 
     crdf=None
     if snapcrdfile:
@@ -193,7 +194,7 @@ def main():
             crdf.write("{0}@{1:%Y%m%d}\n".format(model_itrf,calcDate))
         else:
             crdf.write("NZGD2000_{0}\n".format(defmodel.version()))
-        crdf.write("options no_geoid ellipsoidal_heights degrees c=scmversion\n\n")
+        crdf.write("options no_geoid ellipsoidal_heights degrees c=scmversion c=scmlastobs\n\n")
 
     codes=[]
     for f in os.listdir(stndir):
@@ -265,14 +266,17 @@ def main():
                 comment=updcomment.format(m.versiondate,defmodel.version(),calcDate).replace('"','""')
                 csvu.write('"{0}",{2:.9f},{1:.9f},{3:.4f},"B10","NZGD2000","2000.01.01","{4}"\n'.format(
                     code.upper(),llhnz2k[0],llhnz2k[1],llhnz2k[2],comment))
+
+            scmlastobs="{0:%Y%m%d}".format(m.enddate) if m.enddate is not None else "-"
+            scmversion="SCM_{0:%Y%m%d}".format(m.versiondate)
             if datf:
-                datf.write("{0} {1:SCM_%Y%m%d%H%M%S} {2:.4f} {3:.4f} {4:.4f}\n".format(
-                    code.upper(),m.versiondate,xyz08[0],xyz08[1],xyz08[2]))
+                datf.write("{0} {1} {2} {3:.4f} {4:.4f} {5:.4f}\n".format(
+                    code.upper(),scmversion,scmlastobs,xyz08[0],xyz08[1],xyz08[2]))
 
             if crdf:
                 snapcrd=llh08 if crd_itrf else llhnz2k
-                crdf.write("{0} {1:.10f} {2:.10f} {3:.4f} {4:%Y%m%d} {0}\n".format(code.upper(),
-                    snapcrd[1],snapcrd[0],snapcrd[2],m.versiondate))
+                crdf.write("{0} {1:.10f} {2:.10f} {3:.4f} {4} {5} {0}\n".format(code.upper(),
+                    snapcrd[1],snapcrd[0],snapcrd[2],scmversion,scmlastobs))
         except:
             print(sys.exc_info()[1])
 
