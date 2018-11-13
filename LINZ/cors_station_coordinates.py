@@ -48,6 +48,7 @@ def main():
     parser.add_argument('epoch',help="Epoch or range at which coordinates are required")
     parser.add_argument('output_csv_file',help="File to write coordinates to")
     parser.add_argument('-c','--coordinate-systems',help="Coordinate systems to output (default NZGD2000)")
+    parser.add_argument('-i','--cors-itrf',default='ITRF2008',help="CORS timeseries ITRF reference frame")
     parser.add_argument('-s','--stations',help="Specifies stations to export, separated by +, or @filename")
     parser.add_argument('-n','--nz-only',action='store_true',help="Only list New Zealand stations (including Chathams)")
     parser.add_argument('-t','--solution-type',help="Solution type to extract (required if data includes more than one type)")
@@ -55,7 +56,7 @@ def main():
     args=parser.parse_args()
 
 
-    cors_itrf='ITRF2008'
+    cors_itrf=args.cors_itrf
     tslist=None
     outputfiles={}
     try:
