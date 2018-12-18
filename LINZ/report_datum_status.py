@@ -98,7 +98,7 @@ def getWarnings( status ):
     warnings=[]
     for station in status["station_summary"]:
         for test in tests:
-            if station[test]['status_message'] is not None:
+            if test in station and station[test]['status_message'] is not None:
                 warning=station[test]
                 warning['warning_type']=test
                 warning['code']=station['code']
