@@ -31,7 +31,7 @@ class CORS_Analyst( object ):
     configfile=os.path.basename(refconfigfile)
     configgroup='analysis_settings'
 
-    def __init__( self, verbose=False, write_plot_files=False, configfile=None, configgroup=None ):
+    def __init__( self, verbose=False, write_plot_files=False, configfile=None, configgroup=None, params=None ):
         self._verbose=verbose
         self._writecsv=write_plot_files
         self._configfile=configfile or CORS_Analyst.configfile
@@ -44,8 +44,13 @@ class CORS_Analyst( object ):
         if self._verbose:
             print("Reading configuration from",self._configfile)
 
-        cfg=SafeConfigParser()
+        cfg=SafeConfigParser({
+           'test_stations':'',
+           'test_stations_file':''
+           })
         cfg.readfp(open(self._configfile))
+        for k,v in params.iteritems():
+            cfg.set('DEFAULT',k,v)
         self._cfg=cfg
         self._tsdb=cfg.get(self._configgroup,'timeseries_database')
         if not os.path.exists(self._tsdb):
@@ -279,8 +284,20 @@ class CORS_Analyst( object ):
         return stnresults
 
     def compileAllStationData( self, codelist=None ):
-        if codelist is None or len(codelist) == 0:
-            codelist=self._cfg.get(self._configgroup, 'test_stations').split()
+        if codelist is None:
+            codelist=[]
+        if len(codelist) == 0:
+            codeliststr=self._cfg.get(self._configgroup, 'test_stations').strip()
+            if codeliststr != '':
+                codelist.extend(codeliststr.split())
+
+            codelistfile=self._cfg.get(self._configgroup, 'test_stations_file').strip()
+            if codelistfile != '':
+                with open(codelistfile) as codef:
+                    for l in codef:
+                        l=l.strip()
+                        if not l.startswith('#'):
+                            codelist.extend(l.split())
 
         results={
             "calcdate": datetime.now().strftime("%Y-%m-%d: %H:%M:%S"),
@@ -306,7 +323,7 @@ def main():
                                   "Results of analysis are written to files specified in the configuration file",
                                    usage="%(prog)s [options] config_file code code ...")
     parser.add_argument('config_file',help="Name of the configuration file")
-    parser.add_argument('code',nargs='*',help="Specific station codes to analyse.  Default is as defined in the configuration file")
+    parser.add_argument('code_or_param',nargs='*',help="Specific station codes to analyse.  Default is as defined in the configuration file.  Or param=value to replace config default param")
     parser.add_argument('-v','--verbose',action='store_true',help="Verbose output")
     parser.add_argument('-p','--plot-files',action='store_true',help="Generate CSV files for plotting")
     parser.add_argument('-c','--dump-config-file',action='store_true',help="Print a sample configuration file")
@@ -318,9 +335,16 @@ def main():
                 print(l.strip())
         sys.exit()
 
-    codes=[c.upper() for c in args.code]
+    codes=[]
+    params={}
+    for c in args.code_or_param:
+        if '=' in c:
+            k,v=c.split('=',1)
+            params[k]=v
+        else:
+            codes.append(c.upper())
 
-    a=CORS_Analyst(configfile=args.config_file,verbose=args.verbose,write_plot_files=args.plot_files)
+    a=CORS_Analyst(configfile=args.config_file,verbose=args.verbose,write_plot_files=args.plot_files,params=params)
     a.compileAllStationData(codes)
 
 if __name__ == "__main__":
