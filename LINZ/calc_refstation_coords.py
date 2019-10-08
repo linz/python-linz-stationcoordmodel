@@ -88,7 +88,8 @@ def main():
         def gdbcrds( code ):
             try:
                 markdata=GDB.get(code)
-                return markdata.official_coordinate
+                coord=markdata.coordinate
+                return [coord.longitude,coord.latitude,coord.height]
             except:
                 return None
     elif gdbfile == 'none': 

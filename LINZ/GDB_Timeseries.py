@@ -92,7 +92,8 @@ class GDB_Timeseries_Calculator( object ):
         markdata=GDB.get(code)
         if markdata is None:
             raise RuntimeError('GDB timeseries for '+code+' not available - mark not in GDB')
-        lon,lat,hgt=markdata.official_coordinate
+        coord=markdata.coordinate
+        lon,lat,hgt=coord.longitude, coord.latitude, coord.height
         markxyz=GRS80.xyz(lon,lat,hgt)
         function=lambda d: GRS80.xyz(self._itrfTransformation(lon,lat,hgt,d))
         if xyz0 is None and xyz0Date is not None:

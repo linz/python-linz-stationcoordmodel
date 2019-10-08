@@ -18,8 +18,9 @@ class CoordinateUpdate( object ):
         markdata=GDB.get(code)
         if not markdata:
             raise RuntimeError(code+' is not in the geodetic database')
+        gdbcoord=[coord.longitude,coord.latitude,coord.height]
         if lon is None or lat is None or hgt is None:
-            lon,lat,hgt=markdata.official_coordinate
+            lon,lat,hgt=gdbcoord
 
         self.lon=lon
         self.lat=lat
@@ -28,7 +29,7 @@ class CoordinateUpdate( object ):
         self.cosy=cosy
         self.rdate=rdate
         self.comment=comment
-        self.gdbCoord=markdata.official_coordinate
+        self.gdbCoord=gdbcoord
         self.xyz0=GRS80.xyz(self.gdbCoord)
         self.enu_axes=GRS80.enu_axes(self.gdbCoord[0],self.gdbCoord[1])
         pass
