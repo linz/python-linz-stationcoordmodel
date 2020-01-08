@@ -3,14 +3,23 @@ Maintainer: Chris Crook <ccrook@linz.govt.nz>
 Section: python
 X-Python-Version: >= 2.6
 Priority: optional
-Build-Depends: python-setuptools (>= 0.6b3), python-all (>= 2.6.6-3), debhelper (>= 7.4.3)
+Build-Depends:
+  python3-all,
+  python3-setuptools,
+  debhelper (>= 9)
 Standards-Version: 3.9.1
 
-Package: python-linz-stationcoordmodel
+Package: python3-linz-stationcoordmodel
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, python-linz-geodetic
+Depends: ${misc:Depends}, ${python3:Depends}, 
+  python3-linz-geodetic
+Recommends:
+  python3-pyqt5,
+  python3-numpy,
+  python3-matplotlib,
+  python3-scipy
 Description: Python LINZ station_coord_model
  Tools for calculating and manage the station coordinate models, models of 
  CORS station time series
  .
- This package installs the library for Python 2.
+ This package installs the library for Python 3.

@@ -4,7 +4,11 @@ build
 dist
 linz_stationcoordmodel.egg-info
 python-linz-stationcoordmodel*
-debian/python-linz*
+debian/python3-linz*
 debian/debhelper.log
 debian/substvars
 debian/files
+.vscode
+.pybuild
+debian/.debhelper
+test

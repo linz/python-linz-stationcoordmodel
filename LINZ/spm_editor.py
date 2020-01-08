@@ -8,27 +8,50 @@ License: this code is in the public domain
 Last modified: 19.01.2009
 """
 
-# Imports to support python 3 compatibility
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import sys
 import os
 import os.path
 import argparse
 from datetime import datetime, timedelta
 import re
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+import shutil
+
+from PyQt5.QtCore import (
+    Qt,
+    QAbstractTableModel,
+    QModelIndex,
+    QUrl,
+    QVariant,
+    pyqtSignal,
+)
+
+from PyQt5.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPalette, QPixmap
+
+from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QAction,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDateTimeEdit,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QTableView,
+    QTextEdit,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 import matplotlib
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-try:
-    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
-except ImportError:
-    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
@@ -39,17 +62,18 @@ import numpy as np
 from . import StationCoordinateModel as spm
 from .CORS_Timeseries import TimeseriesList, robustStandardError
 
-help_file='spm_editor_help.html'
-default_model_file='stations/{code}.xml'
-default_model_backup_file=None # stations/{code}.xml.{fdatetime}
-default_timeseries_file='timeseries/{code}_igs08_xyz.dat'
+help_file = "spm_editor_help.html"
+default_model_file = "stations/{code}.xml"
+default_model_backup_file = None  # stations/{code}.xml.{fdatetime}
+default_timeseries_file = "timeseries/{code}_igs08_xyz.dat"
 
-class ModelTableView( QTableView ):
 
-    rowSelected = pyqtSignal( int, name="rowSelected" )
+class ModelTableView(QTableView):
+
+    rowSelected = pyqtSignal(int, name="rowSelected")
 
     def __init__(self, parent=None):
-        QTableView.__init__(self,parent)
+        QTableView.__init__(self, parent)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.horizontalHeader().setStretchLastSection(True)
@@ -60,50 +84,50 @@ class ModelTableView( QTableView ):
         # self.setEditTriggers(QAbstractItemView.AllEditTriggers)
         self.setStyleSheet("* { gridline-color: gray }")
 
-    def selectionChanged( self, selected, deselected ):
-        QTableView.selectionChanged( self, selected, deselected )
+    def selectionChanged(self, selected, deselected):
+        QTableView.selectionChanged(self, selected, deselected)
         self.rowSelected.emit(self.selectedRow())
 
-    def selectedRow( self ):
+    def selectedRow(self):
         rows = self.selectionModel().selectedRows()
-        row=-1
+        row = -1
         if len(rows) == 1:
-            row=rows[0].row()
+            row = rows[0].row()
         return row
-    
-class ComponentTableModel( QAbstractTableModel ):
 
-    def __init__( self, parent=None ):
-        QAbstractTableModel.__init__( self, parent )
-        self.model=None
-        self._headers=['Use?','Fit?','Name']
 
-    def setPredModel(self, model ):
-        self.model=model
+class ComponentTableModel(QAbstractTableModel):
+    def __init__(self, parent=None):
+        QAbstractTableModel.__init__(self, parent)
+        self.model = None
+        self._headers = ["Use?", "Fit?", "Name"]
+
+    def setPredModel(self, model):
+        self.model = model
         self.modelReset.emit()
 
-    def component(self,row):
+    def component(self, row):
         if self.model and row >= 0 and row < len(self.model.components):
-             return self.model.components[row]
+            return self.model.components[row]
         return None
 
-    def row( self, component ):
+    def row(self, component):
         try:
-            row=self.model.components.index(component)
+            row = self.model.components.index(component)
         except:
-            row=-1
+            row = -1
         return row
 
-    def addComponent(self,component):
-        self.beginInsertRows(QModelIndex(), self.rowCount(),self.rowCount())
+    def addComponent(self, component):
+        self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
         self.model.addComponent(component)
         self.endInsertRows()
         self.refresh()
 
-    def removeComponent(self,component):
+    def removeComponent(self, component):
         try:
             index = self.model.components.index(component)
-            self.beginRemoveRows(QModelIndex(),index,index)
+            self.beginRemoveRows(QModelIndex(), index, index)
             self.model.removeComponent(component)
             self.endRemoveRows()
         except:
@@ -111,86 +135,90 @@ class ComponentTableModel( QAbstractTableModel ):
 
     def refresh(self):
         self.model.sortComponents()
-        self.dataChanged.emit(self.index(0,0),self.index(self.rowCount()-1,self.columnCount()-1))
+        self.dataChanged.emit(
+            self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1)
+        )
 
     def count(self):
         return len(self.model.components) if self.model else 0
 
-    def rowCount( self, parent=QModelIndex() ):
+    def rowCount(self, parent=QModelIndex()):
         return self.count() if not parent.isValid() else 0
 
-    def columnCount( self, parent=QModelIndex() ):
+    def columnCount(self, parent=QModelIndex()):
         return 3 if not parent.isValid() else 0
 
-    def flags( self, index ):
+    def flags(self, index):
         flag = Qt.ItemIsEnabled | Qt.ItemIsSelectable
         if index.column() < 2:
             flag |= Qt.ItemIsUserCheckable
         return flag
 
-    def data( self, index, role ):
+    def data(self, index, role):
         row = index.row()
         col = index.column()
         component = self.model.components[row]
         if role == Qt.CheckStateRole:
-            if col==0:
+            if col == 0:
                 return Qt.Checked if component.enabled() else Qt.Unchecked
-            if col==1:
+            if col == 1:
                 return Qt.Unchecked if component.fixed() else Qt.Checked
         elif role == Qt.DisplayRole or role == Qt.EditRole:
             if col == 2:
                 return str(component)
         return QVariant()
 
-    def setData( self, index, value, role ):
+    def setData(self, index, value, role):
         if not index.isValid():
             return False
         row = index.row()
         col = index.column()
         component = self.model.components[row]
         try:
-            if role == Qt.CheckStateRole and col==0:
-                component.setEnabled(value.toBool())
-            elif role == Qt.CheckStateRole and col==1:
-                component.setFixed(not value.toBool())
+            if role == Qt.CheckStateRole and col == 0:
+                component.setEnabled(bool(value))
+            elif role == Qt.CheckStateRole and col == 1:
+                component.setFixed(not bool(value))
             else:
                 return False
-            self.dataChanged.emit(index,index)
+            self.dataChanged.emit(index, index)
         except:
             return False
         return True
 
-    def headerData( self, section, orientation, role ):
+    def headerData(self, section, orientation, role):
         if role == Qt.DisplayRole:
             if orientation == Qt.Horizontal:
                 if self._headers and section < len(self._headers):
                     return self._headers[section]
         return QVariant()
 
-class ParamTableModel( QAbstractTableModel ):
 
-    def __init__( self, parent=None ):
-        QAbstractTableModel.__init__( self, parent )
-        self.component=None
-        self._headers=['Fit?','Name','Value','Error']
+class ParamTableModel(QAbstractTableModel):
+    def __init__(self, parent=None):
+        QAbstractTableModel.__init__(self, parent)
+        self.component = None
+        self._headers = ["Fit?", "Name", "Value", "Error"]
 
-    def setComponent(self, component ):
-        self.component=component
+    def setComponent(self, component):
+        self.component = component
         self.modelReset.emit()
 
     def refresh(self):
-        self.dataChanged.emit(self.index(0,0),self.index(self.rowCount()-1,self.columnCount()-1))
+        self.dataChanged.emit(
+            self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1)
+        )
 
     def count(self):
         return len(self.component.parameters) if self.component else 0
 
-    def rowCount( self, parent=QModelIndex() ):
+    def rowCount(self, parent=QModelIndex()):
         return self.count() if not parent.isValid() else 0
 
-    def columnCount( self, parent=QModelIndex() ):
+    def columnCount(self, parent=QModelIndex()):
         return len(self._headers) if not parent.isValid() else 0
 
-    def flags( self, index ):
+    def flags(self, index):
         flag = Qt.ItemIsEnabled | Qt.ItemIsSelectable
         if index.column() == 2:
             flag |= Qt.ItemIsEditable
@@ -198,16 +226,18 @@ class ParamTableModel( QAbstractTableModel ):
             flag |= Qt.ItemIsUserCheckable
         return flag
 
-    def data( self, index, role ):
+    def data(self, index, role):
         row = index.row()
         col = index.column()
         param = self.component.parameters[row]
         if role == Qt.CheckStateRole:
-            if col==0:
+            if col == 0:
                 return Qt.Unchecked if param.fixed() else Qt.Checked
         elif role == Qt.TextAlignmentRole:
-            if col == 0: return Qt.AlignHCenter
-            if col == 1: return Qt.AlignLeft
+            if col == 0:
+                return Qt.AlignHCenter
+            if col == 1:
+                return Qt.AlignLeft
             return Qt.AlignRight
         elif role == Qt.DisplayRole or role == Qt.EditRole:
             if col == 1:
@@ -216,7 +246,7 @@ class ParamTableModel( QAbstractTableModel ):
                 return param.getValue()
             elif col == 3:
                 if param.calcDate() is None:
-                    return ''
+                    return ""
                 else:
                     return param.getError()
         elif role == Qt.ForegroundRole:
@@ -224,25 +254,25 @@ class ParamTableModel( QAbstractTableModel ):
                 return QColor(Qt.gray)
         return QVariant()
 
-    def setData( self, index, value, role ):
+    def setData(self, index, value, role):
         if not index.isValid():
             return False
         row = index.row()
         col = index.column()
         param = self.component.parameters[row]
         try:
-            if role == Qt.EditRole and col==2:
-                param.setValue(str(value.toString()))
-            elif role == Qt.CheckStateRole and col==0:
-                param.setFixed(not value.toBool())
+            if role == Qt.EditRole and col == 2:
+                param.setValue(str(value))
+            elif role == Qt.CheckStateRole and col == 0:
+                param.setFixed(not bool(value))
             else:
                 return False
-            self.dataChanged.emit(index,index)
+            self.dataChanged.emit(index, index)
         except:
             return False
         return True
 
-    def headerData( self, section, orientation, role ):
+    def headerData(self, section, orientation, role):
         if role == Qt.DisplayRole:
             if orientation == Qt.Horizontal:
                 if self._headers and section < len(self._headers):
@@ -250,119 +280,128 @@ class ParamTableModel( QAbstractTableModel ):
         return QVariant()
 
 
-class SPMNavigationToolbar( NavigationToolbar ):
-
-    def __init__(self, canvas, parent ):
-        NavigationToolbar.__init__(self,canvas,parent)
-        self.canvas=canvas
-        next=None
+class SPMNavigationToolbar(NavigationToolbar):
+    def __init__(self, canvas, parent):
+        NavigationToolbar.__init__(self, canvas, parent)
+        self.canvas = canvas
+        next = None
         for c in self.findChildren(QToolButton):
             if next is None:
-                next=c
-            if str(c.text()) in ('Subplots','Customize'):
+                next = c
+            if str(c.text()) in ("Subplots", "Customize"):
                 c.defaultAction().setVisible(False)
                 continue
-            if str(c.text()) in ('Pan','Zoom'):
+            if str(c.text()) in ("Pan", "Zoom"):
                 c.toggled.connect(self.clearPicker)
-                next=None
+                next = None
 
         #
-        pm=QPixmap(32,32)
-        pm.fill(QApplication.palette().color(QPalette.Normal,QPalette.Button))
-        painter=QPainter(pm)
-        painter.fillRect(6,6,20,20,Qt.red)
-        painter.fillRect(15,3,3,26,Qt.blue)
-        painter.fillRect(3,15,26,3,Qt.blue)
+        pm = QPixmap(32, 32)
+        pm.fill(QApplication.palette().color(QPalette.Normal, QPalette.Button))
+        painter = QPainter(pm)
+        painter.fillRect(6, 6, 20, 20, QColor("red"))
+        painter.fillRect(15, 3, 3, 26, QColor("blue"))
+        painter.fillRect(3, 15, 26, 3, QColor("blue"))
         painter.end()
-        icon=QIcon(pm)
-        picker=QAction("UseObs",self)
+        icon = QIcon(pm)
+        picker = QAction("UseObs", self)
         picker.setIcon(icon)
         picker.setCheckable(True)
         picker.toggled.connect(self.pickerToggled)
         picker.setToolTip("Reject/use observation")
         self.picker = picker
-        button=QToolButton(self)
+        button = QToolButton(self)
         button.setDefaultAction(self.picker)
-        self.insertWidget(next.defaultAction(),button)
+        self.insertWidget(next.defaultAction(), button)
         #
-        pm=QPixmap(32,32)
-        pm.fill(QApplication.palette().color(QPalette.Normal,QPalette.Button))
-        painter=QPainter(pm)
-        painter.fillRect(6,6,20,20,Qt.green)
-        painter.fillRect(15,3,3,26,Qt.blue)
-        painter.fillRect(3,15,26,3,Qt.blue)
+        pm = QPixmap(32, 32)
+        pm.fill(QApplication.palette().color(QPalette.Normal, QPalette.Button))
+        painter = QPainter(pm)
+        painter.fillRect(6, 6, 20, 20, QColor("green"))
+        painter.fillRect(15, 3, 3, 26, QColor("blue"))
+        painter.fillRect(3, 15, 26, 3, QColor("blue"))
         painter.end()
-        icon=QIcon(pm)
-        picker=QAction("UnrejectObs",self)
+        icon = QIcon(pm)
+        picker = QAction("UnrejectObs", self)
         picker.setIcon(icon)
         picker.setToolTip("Use all observations")
         self.unrejectObs = picker
-        button=QToolButton(self)
+        button = QToolButton(self)
         button.setDefaultAction(self.unrejectObs)
-        self.insertWidget(next.defaultAction(),button)
+        self.insertWidget(next.defaultAction(), button)
         #
-        pm=QPixmap(32,32)
-        pm.fill(QApplication.palette().color(QPalette.Normal,QPalette.Button))
-        painter=QPainter(pm)
-        painter.fillRect(6,6,20,20,Qt.red)
-        painter.fillRect(12,12,8,8,Qt.blue)
+        pm = QPixmap(32, 32)
+        pm.fill(QApplication.palette().color(QPalette.Normal, QPalette.Button))
+        painter = QPainter(pm)
+        painter.fillRect(6, 6, 20, 20, QColor("red"))
+        painter.fillRect(12, 12, 8, 8, QColor("blue"))
         painter.end()
-        icon=QIcon(pm)
-        picker=QAction("AutoRejectObs",self)
+        icon = QIcon(pm)
+        picker = QAction("AutoRejectObs", self)
         picker.setIcon(icon)
         picker.setToolTip("Auto reject observations")
         self.autoRejectObs = picker
-        button=QToolButton(self)
+        button = QToolButton(self)
         button.setDefaultAction(self.autoRejectObs)
-        self.insertWidget(next.defaultAction(),button)
-    
-    def clearPicker( self, checked ):
+        self.insertWidget(next.defaultAction(), button)
+
+    def clearPicker(self, checked):
         if checked:
             self.picker.setChecked(False)
 
-    def pickerToggled( self, checked ):
+    def pickerToggled(self, checked):
         if checked:
             if self._active == "PAN":
                 self.pan()
             if self._active == "ZOOM":
                 self.zoom()
-            self.set_message('Reject/use observation')
+            self.set_message("Reject/use observation")
             # self.canvas.setCursor(Qt.ArrowCursor)
 
-    def rejectObsMode( self ):
+    def rejectObsMode(self):
         return self.picker.isChecked()
+
 
 class AppForm(QMainWindow):
 
-    editableTypes=(spm.equipment_offset,spm.tectonic_offset,spm.slow_slip,spm.slow_slip_ramp,spm.exponential_decay,spm.velocity_change)
+    editableTypes = (
+        spm.equipment_offset,
+        spm.tectonic_offset,
+        spm.slow_slip,
+        spm.slow_slip_ramp,
+        spm.exponential_decay,
+        spm.velocity_change,
+    )
 
     def __init__(self, cfgfile=None, options=None, parent=None):
         QMainWindow.__init__(self, parent=None)
-        self.catalog=None
-        self.read_config(cfgfile,options)
-        self.backedup=set()
-        self.model=None
-        self.undostack=[]
-        self.undoptr=-1
-        self.undoing=False
-        self.autoscale=False
-        self.plots=None
-        self.obsplots=None
-        self.setWindowTitle('PositioNZ station time series analysis')
+        self.catalog = None
+        self.read_config(cfgfile, options)
+        self.backedup = set()
+        self.model = None
+        self.undostack = []
+        self.undoptr = -1
+        self.undoing = False
+        self.autoscale = False
+        self.plots = None
+        self.obsplots = None
+        self.setWindowTitle("PositioNZ station time series analysis")
         self.createActions()
         self.createMenu()
         self.createMainFrame()
         self.createStatusBar()
-        #if spmfile:
+        # if spmfile:
         #    self.codelist.hide()
         #    self.modelsonly.hide()
         #    tsfile=tsfile or self.timeseries_file
         #    self.loadModel(spmfile,tsfile)
-        #else:
+        # else:
         self.reloadCodeList()
 
-    def read_config(self,cfgfile,options=None):
-        config={x:None for x in '''
+    def read_config(self, cfgfile, options=None):
+        config = {
+            x: None
+            for x in """
                 model_file model_backup_file timeseries_file timeseries_type 
                 before after
                 update_availability
@@ -370,57 +409,70 @@ class AppForm(QMainWindow):
                 outlier_reject_level
                 outlier_test_range
                 set_model_start_date
-                catalog'''.split()}
+                catalog""".split()
+        }
         if cfgfile and os.path.exists(cfgfile):
             with open(cfgfile) as cfg:
                 for l in cfg:
-                    if re.match(r'^\s*(\#|$)',l):
+                    if re.match(r"^\s*(\#|$)", l):
                         continue
-                    parts=re.split(r'\s+',l.strip(),1)
+                    parts = re.split(r"\s+", l.strip(), 1)
                     if len(parts) != 2:
                         parts.append(None)
                     if parts[0] not in config:
-                        raise RuntimeError('Invalid configuration item: '+parts[0])
-                    config[parts[0]]=parts[1]
+                        raise RuntimeError("Invalid configuration item: " + parts[0])
+                    config[parts[0]] = parts[1]
 
         if options:
             config.update(options)
-        config={k:v for k,v in config.iteritems() if v is not None}
-        self.config=config
-        self.model_file=config.get('model_file',default_model_file)
-        self.model_backup_file=config.get('model_backup_file',default_model_backup_file)
-        self.update_availability=config.get('update_availability','False').lower()=='true'
-        self.set_start_date=config.get('set_model_start_date','False').lower()=='true'
-        if '{code}' not in self.model_file:
+        config = {k: v for k, v in config.items() if v is not None}
+        self.config = config
+        self.model_file = config.get("model_file", default_model_file)
+        self.model_backup_file = config.get(
+            "model_backup_file", default_model_backup_file
+        )
+        self.update_availability = (
+            config.get("update_availability", "False").lower() == "true"
+        )
+        self.set_start_date = (
+            config.get("set_model_start_date", "False").lower() == "true"
+        )
+        if "{code}" not in self.model_file:
             raise RuntimeError('Configuration item model_file must include "{code}"')
-        if ( self.model_backup_file and 
-             '{code}' not in self.model_backup_file and 
-             '{model_file}' not in self.model_backup_file ):
-            raise RuntimeError('Configuration item model_backup_file must include "{model_file}" or "{code}"')
-    
-        self.timeseries_file=config.get('timeseries_file',default_timeseries_file)
-        self.robust_se_percentile=float(config.get('robust_se_percentile','95.0'))
-        self.outlier_reject_level=float(config.get('outlier_reject_level','5.0'))
-        self.outlier_test_range=float(config.get('outlier_test_range','10.0'))
-        solutiontypes=config.get('timeseries_type','')
-        self.solutiontypes=solutiontypes
-        self.timeseries_list=TimeseriesList(self.timeseries_file,solutiontypes or None,
-              after=config.get('after'),before=config.get('before'))
-        catalog_file=config.get('catalog')
+        if (
+            self.model_backup_file
+            and "{code}" not in self.model_backup_file
+            and "{model_file}" not in self.model_backup_file
+        ):
+            raise RuntimeError(
+                'Configuration item model_backup_file must include "{model_file}" or "{code}"'
+            )
+
+        self.timeseries_file = config.get("timeseries_file", default_timeseries_file)
+        self.robust_se_percentile = float(config.get("robust_se_percentile", "95.0"))
+        self.outlier_reject_level = float(config.get("outlier_reject_level", "5.0"))
+        self.outlier_test_range = float(config.get("outlier_test_range", "10.0"))
+        solutiontypes = config.get("timeseries_type", "")
+        self.solutiontypes = solutiontypes
+        self.timeseries_list = TimeseriesList(
+            self.timeseries_file,
+            solutiontypes or None,
+            after=config.get("after"),
+            before=config.get("before"),
+        )
+        catalog_file = config.get("catalog")
         if catalog_file is None:
-            catalog_file=re.sub(r'(\.cfg)?$','.catalog',cfgfile,re.I)
+            catalog_file = re.sub(r"(\.cfg)?$", ".catalog", cfgfile, re.I)
         self.loadCatalog(catalog_file)
 
     def savePlot(self):
         file_choices = "PNG file (*.png)"
-        
-        path = unicode(QFileDialog.getSaveFileName(self, 
-                        'Save file', '', 
-                        file_choices))
+
+        path = str(QFileDialog.getSaveFileName(self, "Save file", "", file_choices))
         if path:
             self.canvas.print_figure(path, dpi=self.dpi)
-            self.statusBar().showMessage('Saved to %s' % path, 2000)
-    
+            self.statusBar().showMessage("Saved to %s" % path, 2000)
+
     def on_about(self):
         msg = """ 
         Station prediction model editor
@@ -428,27 +480,29 @@ class AppForm(QMainWindow):
         View CORS time series and build/edit station prediction models
         """
         QMessageBox.about(self, "About", msg.strip())
-    
-    def gnsfile(self,code):
-        return modelbasefile.replace('{code}',code)
 
-    def checkSaveModel(self,canCancel=False):
-        model=self.model
+    def checkSaveModel(self, canCancel=False):
+        model = self.model
         if not model or not model.changed():
             return True
-        code=model.station
+        code = model.station
         buttons = QMessageBox.Yes | QMessageBox.No
         if canCancel:
             buttons = buttons | QMessageBox.Cancel
-        result=QMessageBox.question(self,"Save changes to "+code,"Do you want to save changes to "+code+"?",
-                                    buttons, QMessageBox.Yes )
+        result = QMessageBox.question(
+            self,
+            "Save changes to " + code,
+            "Do you want to save changes to " + code + "?",
+            buttons,
+            QMessageBox.Yes,
+        )
         if result == QMessageBox.Cancel:
             return False
         if result == QMessageBox.Yes:
             self.saveModel()
         return True
 
-    def backupModel( self ):
+    def backupModel(self):
         if self.model is None or self.model_backup_file is None:
             return
         code = self.model.station
@@ -456,112 +510,120 @@ class AppForm(QMainWindow):
             return
         self.backedup.add(code)
 
-        oldfile=self.model.filename
+        oldfile = self.model.filename
         if not os.path.exists(oldfile):
             return
-        filedate=datetime.fromtimestamp(os.path.getmtime(oldfile))
-        ymd=filedate.strftime('%Y%m%d')
-        ymdhms=filedate.strftime('%Y%m%d%H%M%S')
-        backupfile = (self.model_backup_file.replace('{code}',code).
-                      replace('{model_file}',oldfile).
-                      replace('{fdate}',ymd).
-                      replace('{fdatetime}',ymdhms))
+        filedate = datetime.fromtimestamp(os.path.getmtime(oldfile))
+        ymd = filedate.strftime("%Y%m%d")
+        ymdhms = filedate.strftime("%Y%m%d%H%M%S")
+        backupfile = (
+            self.model_backup_file.replace("{code}", code)
+            .replace("{model_file}", oldfile)
+            .replace("{fdate}", ymd)
+            .replace("{fdatetime}", ymdhms)
+        )
         try:
-            os.renames(oldfile,backupfile)
+            os.renames(oldfile, backupfile)
         except:
-            shutil.copy(oldfile,backupfile)
+            shutil.copy(oldfile, backupfile)
 
-    def saveModel( self ):
+    def saveModel(self):
         if not self.model:
             return
         if self.model.changed():
-            self.backupModel();
+            self.backupModel()
         self.model.save(updateAvailability=self.update_availability)
-        self.statusText.setText('Model saved')
+        self.statusText.setText("Model saved")
 
-    def savestate( self, clearstack=False ):
+    def savestate(self, clearstack=False):
         if self.undoing:
             return
         if clearstack:
-            self.undostack=[]
-            self.undoptr=-1
+            self.undostack = []
+            self.undoptr = -1
         if not self.model:
             return
         xmlstr = self.model.toXmlString()
         if self.undoptr >= 0 and xmlstr == self.undostack[-1]:
             return
         self.undostack.append(xmlstr)
-        self.undoptr=len(self.undostack)-1
+        self.undoptr = len(self.undostack) - 1
         self.undoAction.setEnabled(self.undoptr > 0)
         self.redoAction.setEnabled(False)
 
-    def undo( self ):
+    def undo(self):
         if self.model and self.undoptr > 0:
             self.undoptr -= 1
-            self.model.loadFromXml( self.undostack[self.undoptr] )
+            self.model.loadFromXml(self.undostack[self.undoptr])
             try:
-                self.undoing=True
+                self.undoing = True
                 self.components.refresh()
                 self.loadComponent(self.selectedComponent())
                 self.recalculate(True)
             finally:
-                self.undoing=False
+                self.undoing = False
             self.undoAction.setEnabled(self.undoptr > 0)
             self.redoAction.setEnabled(True)
 
-    def redo( self ):
-        if self.model and self.undoptr < len(self.undostack)-1:
+    def redo(self):
+        if self.model and self.undoptr < len(self.undostack) - 1:
             self.undoptr += 1
-            self.model.loadFromXml( self.undostack[self.undoptr] )
+            self.model.loadFromXml(self.undostack[self.undoptr])
             try:
-                self.undoing=True
+                self.undoing = True
                 self.components.refresh()
                 self.params.loadComponent(self.selectedComponent())
                 self.recalculate(True)
             finally:
-                self.undoing=False
+                self.undoing = False
             self.undoAction.setEnabled(self.undoptr > 0)
-            self.redoAction.setEnabled(self.undoptr < len(self.undostack)-1)
+            self.redoAction.setEnabled(self.undoptr < len(self.undostack) - 1)
 
     def reload(self):
         """ Redraws the figure
         """
 
-        code=str(self.codelist.currentItem().text())
-        model=self.model
-        if model and model.station==code:
+        code = str(self.codelist.currentItem().text())
+        model = self.model
+        if model and model.station == code:
             return
         if not self.checkSaveModel(canCancel=True):
             return
         modelFile = self.modelFile(code)
-        self.loadModel(modelFile,code)
+        self.loadModel(modelFile, code)
 
-    def loadCatalog(self,catalogFile):
+    def loadCatalog(self, catalogFile):
         try:
-            loadfile=os.path.exists(catalogFile)
-            self.catalog=spm.Model(station='____',filename=catalogFile,loadfile=loadfile)
+            loadfile = os.path.exists(catalogFile)
+            self.catalog = spm.Model(
+                station="____", filename=catalogFile, loadfile=loadfile
+            )
         except RuntimeError as ex:
-            self.statusText.setText(ex.message)
-            self.catalog=None
+            self.statusText.setText(str(ex))
+            self.catalog = None
 
-    def removeFromCatalog( self, component ):
-        catalog=self.catalog
+    def removeFromCatalog(self, component):
+        catalog = self.catalog
         if catalog is not None and component in catalog.components:
             catalog.removeComponent(component)
             catalog.save()
 
-    def addComponentToCatalog( self ):
-        component=self.params.component
+    def addComponentToCatalog(self):
+        component = self.params.component
         if self.catalog is None:
-            self.statusText.setText('Catalog not defined - cannot add component to it')
+            self.statusText.setText("Catalog not defined - cannot add component to it")
             return
         if type(component) not in self.editableTypes:
-            self.statusText.setText('Cannot save {0} type component in catalog'.format(type(component).__name__))
+            self.statusText.setText(
+                "Cannot save {0} type component in catalog".format(
+                    type(component).__name__
+                )
+            )
             return
         if not component.eventName():
-            self.statusText.setText('Saved components must have an event name')
+            self.statusText.setText("Saved components must have an event name")
             return
-        catalog=self.catalog
+        catalog = self.catalog
         for c in catalog.components:
             if c.eventName() == component.eventName():
                 catalog.removeComponent(c)
@@ -569,25 +631,25 @@ class AppForm(QMainWindow):
         catalog.save()
         self.populateComponentTypes()
 
-    def loadModel(self,modelFile,code=None):
-        loadfile=os.path.exists(modelFile)
+    def loadModel(self, modelFile, code=None):
+        loadfile = os.path.exists(modelFile)
         try:
-            self.model=spm.Model(station=code,filename=modelFile,loadfile=loadfile)
-            code=self.model.station
-            timeseries=self.timeseries_list.get(code)
-            self.model.loadTimeSeries(timeseries,setdate=self.set_start_date)
+            self.model = spm.Model(station=code, filename=modelFile, loadfile=loadfile)
+            code = self.model.station
+            timeseries = self.timeseries_list.get(code)
+            self.model.loadTimeSeries(timeseries, setdate=self.set_start_date)
             if not loadfile:
                 self.backedup.add(code)
             self.savestate(True)
-            dates,obs,useobs = self.model.getObs()
-            message="{0}: {1} observations".format(code,len(dates))
+            dates, obs, useobs = self.model.getObs()
+            message = "{0}: {1} observations".format(code, len(dates))
             self.statusText.setText(message)
         except RuntimeError as ex:
-            self.statusText.setText(ex.message)
-            self.model=None
+            self.statusText.setText(str(ex))
+            self.model = None
 
         self.loadComponent(None)
-        self.eventName.setText('')
+        self.eventName.setText("")
         self.components.setPredModel(self.model)
         self.componentTable.resizeColumnsToContents()
 
@@ -595,9 +657,9 @@ class AppForm(QMainWindow):
         self.rescalePlot()
         self.writeStats()
 
-    def loadComponent( self, component ):
-        self.removeButton.setEnabled( type(component) in self.editableTypes )
-        self.eventName.setText('')
+    def loadComponent(self, component):
+        self.removeButton.setEnabled(type(component) in self.editableTypes)
+        self.eventName.setText("")
         self.eventName.setEnabled(False)
         self.params.setComponent(component)
         self.paramTable.resizeColumnsToContents()
@@ -606,28 +668,29 @@ class AppForm(QMainWindow):
             self.eventName.setEnabled(True)
             self.statusText.setText(str(component))
 
-    def writeStats( self ):
-        message="Summary stats: {0} days".format(self.obs_count)
-        for i,axis in enumerate(['e','n','u']):
-            message=message+"\n{0} obs {1:.2f} mm residual {2:.2f} mm".format(
-                axis,self.obs_rse[i]*1000,self.residual_rse[i]*1000)
+    def writeStats(self):
+        message = "Summary stats: {0} days".format(self.obs_count)
+        for i, axis in enumerate(["e", "n", "u"]):
+            message = message + "\n{0} obs {1:.2f} mm residual {2:.2f} mm".format(
+                axis, self.obs_rse[i] * 1000, self.residual_rse[i] * 1000
+            )
         self.infobox.setPlainText(message)
 
-    def calculate( self ):
-        self.obs_rse=[0,0,0]
-        self.residual_rse=[0,0,0]
-        self.obs_count=0
-        dates,obs,useobs = self.model.getObs()
+    def calculate(self):
+        self.obs_rse = [0, 0, 0]
+        self.residual_rse = [0, 0, 0]
+        self.obs_count = 0
+        dates, obs, useobs = self.model.getObs()
         if dates is None or obs is None or len(obs) == 0:
             return
 
-        self.obs_count=len(dates)
-        self.obs_rse=robustStandardError(obs)
-        residuals=[0,0,0]
-        calc=None
+        self.obs_count = len(dates)
+        self.obs_rse = robustStandardError(obs)
+        residuals = [0, 0, 0]
+        calc = None
         if self.model:
-            calc=self.model.calc(dates)
-            diff=obs-calc
+            calc = self.model.calc(dates)
+            diff = obs - calc
             # This code was to remove mean difference between observed and calced..
             # Should not be doing this!
             # offset=np.mean(diff,axis=0)
@@ -635,13 +698,15 @@ class AppForm(QMainWindow):
             # diff -= offset
 
             # Calculate a "robust residual" measure based on 95%ile
-            residuals=np.percentile(np.abs(diff[useobs]),95.0,axis=0)/(1.96*np.sqrt(2.0))
+            residuals = np.percentile(np.abs(diff[useobs]), 95.0, axis=0) / (
+                1.96 * np.sqrt(2.0)
+            )
 
         self.calc = calc
-        self.residual_rse=residuals
+        self.residual_rse = residuals
 
-    def modelFile(self,code):
-        filename=self.model_file.replace('{code}',code)
+    def modelFile(self, code):
+        filename = self.model_file.replace("{code}", code)
         return filename
 
     def reloadCodeList(self):
@@ -653,12 +718,13 @@ class AppForm(QMainWindow):
                 continue
             self.codelist.addItem(code)
 
-    def setAutoscale( self, auto=True ):
+    def setAutoscale(self, auto=True):
         for a in self.plots:
             a.autoscale(auto)
 
-    def rescalePlot( self ):
-        self.autoscale=True
+    def rescalePlot(self):
+        self.autoscale = True
+        self.toolbar.update()
         self.replot()
 
     def recalculate(self, oldstate=False):
@@ -671,21 +737,22 @@ class AppForm(QMainWindow):
     def replot(self):
         if not self.model:
             return
-        dates,obs,useobs = self.model.getObs()
+        dates, obs, useobs = self.model.getObs()
         if dates is None or obs is None or len(obs) == 0:
             return
         plotdays = self.timeasdays.isChecked()
-        days=spm.days_array(dates)
+        days = spm.days_array(dates)
         times = days if plotdays else dates
 
-
-        dmin=np.min(dates)
-        dmax=np.max(dates)
-        cdates=mdates.num2date(mdates.drange(dmin,dmax+timedelta(0.5),timedelta(1)))
-        cdays=spm.days_array(cdates)
+        dmin = np.min(dates)
+        dmax = np.max(dates)
+        cdates = mdates.num2date(
+            mdates.drange(dmin, dmax + timedelta(0.5), timedelta(1))
+        )
+        cdays = spm.days_array(cdates)
         ctimes = cdays if plotdays else cdates
 
-        calc=self.model.calc(cdates)
+        calc = self.model.calc(cdates)
 
         plots = self.plots
         for axes in plots:
@@ -695,40 +762,52 @@ class AppForm(QMainWindow):
                 while axes.lines:
                     axes.lines[0].remove()
             if plotdays:
-                axes.format_xdata=mticker.ScalarFormatter(useOffset=False)
+                axes.format_xdata = mticker.ScalarFormatter(useOffset=False)
             else:
-                axes.format_xdata=mdates.DateFormatter('%d-%m-%Y')
+                axes.format_xdata = mdates.DateFormatter("%d-%m-%Y")
 
-        title=self.model.station+' time series'
-        axis_labels=['East mm','North mm','Up mm']
+        title = self.model.station + " time series"
+        axis_labels = ["East mm", "North mm", "Up mm"]
 
-        self.obsplots=[[None,None],[None,None],[None,None]]
-        
+        self.obsplots = [[None, None], [None, None], [None, None]]
+
         detrend = self.detrend.isChecked()
-        trend=0
+        trend = 0
         for i in range(3):
             if detrend:
-                trendp=np.poly1d(np.polyfit(days,obs[:,i],1))
-                trend=trendp(days)
-            obsi=(obs[:,i]-trend)*1000
-            self.obsplots[i][0],=plots[i].plot(times,obsi,'b+',label='Time series',picker=5)
+                trendp = np.poly1d(np.polyfit(days, obs[:, i], 1))
+                trend = trendp(days)
+            obsi = (obs[:, i] - trend) * 1000
+            self.obsplots[i][0], = plots[i].plot(
+                times, obsi, "b+", label="Time series", picker=5
+            )
             if detrend:
-                trend=trendp(cdays)
-            plots[i].plot(ctimes,(calc[:,i]-trend)*1000,marker=None,linestyle='-',color='#00FF00',linewidth=2,label='Prediction model')
+                trend = trendp(cdays)
+            plots[i].plot(
+                ctimes,
+                (calc[:, i] - trend) * 1000,
+                marker=None,
+                linestyle="-",
+                color="#00FF00",
+                linewidth=2,
+                label="Prediction model",
+            )
 
-            self.obsplots[i][1],=plots[i].plot(times[~useobs],obsi[~useobs],'r+',markeredgewidth=2)
+            self.obsplots[i][1], = plots[i].plot(
+                times[~useobs], obsi[~useobs], "r+", markeredgewidth=2
+            )
             plots[i].set_ylabel(axis_labels[i])
             plots[i].tick_params(labelsize=8)
-#        if filename:
-#            plt.savefig(filename, bbox_inches='tight')
-#        else:
+        #        if filename:
+        #            plt.savefig(filename, bbox_inches='tight')
+        #        else:
         if True:
             self.figtitle.set_text(title)
             # plt.show()
 
         if self.autoscale:
             self.setAutoscale(True)
-            self.autoscale=False
+            self.autoscale = False
         if not plotdays:
             self.fig.autofmt_xdate()
         self.canvas.draw()
@@ -736,30 +815,30 @@ class AppForm(QMainWindow):
 
     def replotUsed(self):
         if self.obsplots:
-            dates,obs,useobs = self.model.getObs()
+            dates, obs, useobs = self.model.getObs()
             for p in self.obsplots:
-                dplot=p[0]
-                xplot=p[1]
+                dplot = p[0]
+                xplot = p[1]
                 xplot.set_xdata(dplot.get_xdata()[~useobs])
                 xplot.set_ydata(dplot.get_ydata()[~useobs])
         self.canvas.draw()
-    
-    def updateEventName(self,name):
-        component=self.params.component
+
+    def updateEventName(self, name):
+        component = self.params.component
         if component:
             component.setEventName(str(name))
 
     def fitComponent(self):
-        model=self.model
+        model = self.model
         if not model:
             return
-        component=self.params.component
+        component = self.params.component
         if component:
             savefixed = component.fixed()
             component.setFixed(False)
-        app=QApplication.instance()
-        self.statusText.setText('Fitting ...')
-        message='Failed'
+        app = QApplication.instance()
+        self.statusText.setText("Fitting ...")
+        message = "Failed"
         try:
             app.setOverrideCursor(Qt.WaitCursor)
             ok, message = model.fit()
@@ -775,13 +854,13 @@ class AppForm(QMainWindow):
             self.recalculate()
 
     def fitAllLinear(self):
-        model=self.model
+        model = self.model
         if not model:
             return
-        app=QApplication.instance()
-        component=self.params.component
-        self.statusText.setText('Fitting ...')
-        message='Failed'
+        app = QApplication.instance()
+        component = self.params.component
+        self.statusText.setText("Fitting ...")
+        message = "Failed"
         try:
             app.setOverrideCursor(Qt.WaitCursor)
             ok, message = model.fitAllLinear()
@@ -794,7 +873,7 @@ class AppForm(QMainWindow):
             self.params.refresh()
             self.recalculate()
 
-    def calcDate( self, xvalue ):
+    def calcDate(self, xvalue):
         if self.timeasdays.isChecked():
             return spm.fromday(xvalue)
         elif type(xvalue) == datetime:
@@ -802,150 +881,165 @@ class AppForm(QMainWindow):
         else:
             return mdates.num2date(xvalue)
 
-    def axesClicked( self, event ):
+    def axesClicked(self, event):
         try:
             self.addComponentDate.setDateTime(self.calcDate(event.xdata))
         except:
             pass
 
-    def obsPicked( self, event ):
-        xdata,ydata = event.artist.get_data()
-        date=xdata[event.ind][0]
-        date=self.calcDate(date)
+    def obsPicked(self, event):
+        xdata, ydata = event.artist.get_data()
+        date = xdata[event.ind][0]
+        date = self.calcDate(date)
         self.addComponentDate.setDateTime(date)
         if self.model and self.toolbar.rejectObsMode():
-            self.model.setUseObs( event.ind[0], toggle=True )
+            self.model.setUseObs(event.ind[0], toggle=True)
             self.replotUsed()
 
-    def unrejectObsClicked( self ):
+    def unrejectObsClicked(self):
         if self.model:
-            self.model.clearExcludedObs()
-            self.replotUsed()
+            try:
+                app = QApplication.instance()
+                app.setOverrideCursor(Qt.WaitCursor)
+                self.model.clearExcludedObs()
+                self.replotUsed()
+            finally:
+                app.restoreOverrideCursor()
 
-    def autoRejectObsClicked( self ):
+    def autoRejectObsClicked(self):
         if self.model:
-            self.model.autoRejectObs(
-                ndays=self.outlier_test_range,
-                tolerance=self.outlier_reject_level,
-                percentile=self.robust_se_percentile)
-            self.replotUsed()
+            try:
+                app = QApplication.instance()
+                app.setOverrideCursor(Qt.WaitCursor)
+                self.model.autoRejectObs(
+                    ndays=self.outlier_test_range,
+                    tolerance=self.outlier_reject_level,
+                    percentile=self.robust_se_percentile,
+                )
+                self.replotUsed()
+            finally:
+                app.restoreOverrideCursor()
 
-    def addComponent( self ):
-        ctype = self.addComponentType.itemData(self.addComponentType.currentIndex()).toPyObject()
+    def addComponent(self):
+        ctype = self.addComponentType.itemData(self.addComponentType.currentIndex())
         if type(ctype) is type:
             cdate = self.addComponentDate.dateTime().toPyDateTime()
-            component=ctype(self.model,cdate)
+            component = ctype(self.model, cdate)
         else:
-            component=ctype.copyTo(self.model)
+            component = ctype.copyTo(self.model)
         self.components.addComponent(component)
         self.recalculate()
         self.selectComponent(component)
 
-    def removeComponent( self ):
-        component=self.selectedComponent()
+    def removeComponent(self):
+        component = self.selectedComponent()
         self.components.removeComponent(component)
         self.recalculate()
 
-    def selectedComponent( self ):
+    def selectedComponent(self):
         return self.components.component(self.componentTable.selectedRow())
 
-    def selectComponent( self, component ):
-        row=self.components.row(component)
+    def selectComponent(self, component):
+        row = self.components.row(component)
         if row >= 0:
             self.componentTable.selectRow(row)
 
-    def populateComponentTypes( self ):
+    def populateComponentTypes(self):
         self.addComponentType.clear()
         for t in self.editableTypes:
-            self.addComponentType.addItem(t.__name__,t)
+            self.addComponentType.addItem(t.__name__, t)
         if self.catalog is not None:
             for c in self.catalog.components:
                 if type(c) in self.editableTypes:
-                    self.addComponentType.addItem(c.eventName(),c)
+                    self.addComponentType.addItem(c.eventName(), c)
 
     def createMainFrame(self):
         self.main_frame = QWidget()
-        
-        # Create the mpl Figure and FigCanvas objects. 
-        
+
+        # Create the mpl Figure and FigCanvas objects.
+
         self.dpi = 100
-        samescale=False
-        title='CORS time series analysis'
-        fig, plots=plt.subplots(3,1,sharex=True,sharey=samescale,num=title,figsize=(8,6),dpi=self.dpi)
-        self.fig=fig
-        self.figtitle=fig.suptitle('No station selected')
-        self.plots=plots
+        samescale = False
+        title = "CORS time series analysis"
+        fig, plots = plt.subplots(
+            3, 1, sharex=True, sharey=samescale, num=title, figsize=(8, 6), dpi=self.dpi
+        )
+        self.fig = fig
+        self.figtitle = fig.suptitle("No station selected")
+        self.plots = plots
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setParent(self.main_frame)
-        
+
         # Create the navigation toolbar, tied to the canvas
         #
         self.toolbar = SPMNavigationToolbar(self.canvas, self.main_frame)
         self.toolbar.unrejectObs.triggered.connect(self.unrejectObsClicked)
         self.toolbar.autoRejectObs.triggered.connect(self.autoRejectObsClicked)
-        
+
         # Other GUI controls
 
         self.codelist = QListWidget(self)
-        self.modelsonly = QCheckBox('Modelled stations only',self)
+        self.modelsonly = QCheckBox("Modelled stations only", self)
 
-        self.detrend = QCheckBox('Detrend',self)
+        self.detrend = QCheckBox("Detrend", self)
         self.detrend.setChecked(True)
-        self.timeasdays = QCheckBox('Time as days',self)
+        self.timeasdays = QCheckBox("Time as days", self)
         self.infobox = QTextEdit(self)
         self.infobox.setReadOnly(True)
-        self.components=ComponentTableModel(self)
-        self.componentTable=ModelTableView(self)
-        self.componentTable.setModel(self.components )
-        self.params=ParamTableModel(self)
-        self.paramTable=ModelTableView(self)
-        self.paramTable.setModel(self.params )
-        self.fitButton=QToolButton(self)
+        self.components = ComponentTableModel(self)
+        self.componentTable = ModelTableView(self)
+        self.componentTable.setModel(self.components)
+        self.params = ParamTableModel(self)
+        self.paramTable = ModelTableView(self)
+        self.paramTable.setModel(self.params)
+        self.fitButton = QToolButton(self)
         self.fitButton.setDefaultAction(self.fitAction)
-        self.fitAllButton=QToolButton(self)
+        self.fitAllButton = QToolButton(self)
         self.fitAllButton.setDefaultAction(self.fitAllLinearAction)
-        self.undoButton=QToolButton(self)
+        self.undoButton = QToolButton(self)
         self.undoButton.setDefaultAction(self.undoAction)
-        self.redoButton=QToolButton(self)
+        self.redoButton = QToolButton(self)
         self.redoButton.setDefaultAction(self.redoAction)
-        self.catalogButton=QToolButton(self)
+        self.catalogButton = QToolButton(self)
         self.catalogButton.setDefaultAction(self.catalogAction)
-        self.removeButton=QPushButton('Remove',self)
+        self.removeButton = QPushButton("Remove", self)
         self.removeButton.setEnabled(False)
-        self.addComponentType=QComboBox(self)
+        self.addComponentType = QComboBox(self)
         self.populateComponentTypes()
-        self.addComponentDate=QDateTimeEdit(self);
-        self.addButton=QPushButton('Add',self)
-        self.eventName=QLineEdit(self)
+        self.addComponentDate = QDateTimeEdit(self)
+        self.addButton = QPushButton("Add", self)
+        self.eventName = QLineEdit(self)
         self.eventName.setEnabled(False)
 
         # Connect up events
 
-        self.codelist.itemSelectionChanged.connect( self.reload )
+        self.codelist.itemSelectionChanged.connect(self.reload)
         self.modelsonly.toggled.connect(self.reloadCodeList)
-        self.detrend.toggled.connect( self.rescalePlot )
-        self.timeasdays.toggled.connect( self.rescalePlot )
-        self.componentTable.rowSelected.connect( lambda r: self.loadComponent(self.components.component(r)))
-        self.components.dataChanged.connect( lambda x,y: self.recalculate() )
-        self.params.dataChanged.connect( lambda x,y: self.recalculate() )
-        self.canvas.mpl_connect('button_press_event',self.axesClicked)
-        self.canvas.mpl_connect('pick_event',self.obsPicked)
-        self.removeButton.clicked.connect( self.removeComponent )
-        self.addButton.clicked.connect( self.addComponent )
+        self.detrend.toggled.connect(self.rescalePlot)
+        self.timeasdays.toggled.connect(self.rescalePlot)
+        self.componentTable.rowSelected.connect(
+            lambda r: self.loadComponent(self.components.component(r))
+        )
+        self.components.dataChanged.connect(lambda x, y: self.recalculate())
+        self.params.dataChanged.connect(lambda x, y: self.recalculate())
+        self.canvas.mpl_connect("button_press_event", self.axesClicked)
+        self.canvas.mpl_connect("pick_event", self.obsPicked)
+        self.removeButton.clicked.connect(self.removeComponent)
+        self.addButton.clicked.connect(self.addComponent)
         self.eventName.textEdited.connect(self.updateEventName)
 
         # Layout
 
         hbox1 = QHBoxLayout()
-        hbox1.addWidget(self.toolbar,1)
-        hbox1.addWidget(self.detrend,0)
-        hbox1.addWidget(self.timeasdays,0)
+        hbox1.addWidget(self.toolbar, 1)
+        hbox1.addWidget(self.detrend, 0)
+        hbox1.addWidget(self.timeasdays, 0)
 
         vbox1 = QVBoxLayout()
         vbox1.addWidget(self.codelist)
         vbox1.addWidget(self.modelsonly)
         vbox1.addWidget(self.infobox)
-        
+
         bbox1 = QHBoxLayout()
         bbox1.addWidget(self.removeButton)
         bbox1.addWidget(self.addComponentType)
@@ -956,8 +1050,8 @@ class AppForm(QMainWindow):
         vbox2.addLayout(bbox1)
 
         nmbox = QHBoxLayout()
-        nmbox.addWidget(QLabel('Event',self),0)
-        nmbox.addWidget(self.eventName,1)
+        nmbox.addWidget(QLabel("Event", self), 0)
+        nmbox.addWidget(self.eventName, 1)
 
         bbox2 = QHBoxLayout()
         bbox2.addWidget(self.fitButton)
@@ -972,66 +1066,80 @@ class AppForm(QMainWindow):
         vbox3.addLayout(bbox2)
 
         hbox2 = QHBoxLayout()
-        hbox2.addLayout(vbox1,1)
-        hbox2.addLayout(vbox2,2)
-        hbox2.addLayout(vbox3,2)
-        
+        hbox2.addLayout(vbox1, 1)
+        hbox2.addLayout(vbox2, 2)
+        hbox2.addLayout(vbox3, 2)
+
         vbox = QVBoxLayout()
-        vbox.addWidget(self.canvas,2)
-        vbox.addLayout(hbox1,0)
-        vbox.addLayout(hbox2,1)
-        
+        vbox.addWidget(self.canvas, 2)
+        vbox.addLayout(hbox1, 0)
+        vbox.addLayout(hbox2, 1)
+
         self.main_frame.setLayout(vbox)
         self.setCentralWidget(self.main_frame)
-    
+
     def createStatusBar(self):
         self.statusText = QLabel("")
         self.statusBar().addWidget(self.statusText, 1)
-        
-    def show_help( self ):
-        helpfile = os.path.join(os.path.dirname(os.path.abspath(__file__)),help_file)
+
+    def show_help(self):
+        helpfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), help_file)
         QDesktopServices.openUrl(QUrl.fromLocalFile(helpfile))
 
-    def createActions( self ):
-        self.saveAction = self.createAction("Save &model",
-            shortcut="Ctrl+S", slot=self.saveModel, 
-            tip="Save the current model")
-        self.savePlotAction = self.createAction("Save &plot",
-            shortcut="Ctrl+P", slot=self.savePlot, 
-            tip="Save the plot")
-        self.quitAction = self.createAction("&Quit", slot=self.close, 
-            shortcut="Ctrl+Q", tip="Close the application")
-        self.undoAction = self.createAction("&Undo", slot=self.undo, 
-            shortcut="Ctrl+U", tip="Undo the last change")
+    def createActions(self):
+        self.saveAction = self.createAction(
+            "Save &model",
+            shortcut="Ctrl+S",
+            slot=self.saveModel,
+            tip="Save the current model",
+        )
+        self.savePlotAction = self.createAction(
+            "Save &plot", shortcut="Ctrl+P", slot=self.savePlot, tip="Save the plot"
+        )
+        self.quitAction = self.createAction(
+            "&Quit", slot=self.close, shortcut="Ctrl+Q", tip="Close the application"
+        )
+        self.undoAction = self.createAction(
+            "&Undo", slot=self.undo, shortcut="Ctrl+U", tip="Undo the last change"
+        )
         self.undoAction.setEnabled(False)
-        self.redoAction = self.createAction("&Redo", slot=self.redo, 
-            shortcut="Ctrl+R", tip="Redo the last change")
+        self.redoAction = self.createAction(
+            "&Redo", slot=self.redo, shortcut="Ctrl+R", tip="Redo the last change"
+        )
         self.redoAction.setEnabled(False)
-        self.catalogAction = self.createAction("Catalog", slot=self.addComponentToCatalog, 
-            tip="Add current component to catalog")
+        self.catalogAction = self.createAction(
+            "Catalog",
+            slot=self.addComponentToCatalog,
+            tip="Add current component to catalog",
+        )
 
-        self.fitAction = self.createAction("&Fit", slot=self.fitComponent,
-            tip="Fit selected components and parameters")
-        self.fitAllLinearAction = self.createAction("Fit &all", slot=self.fitAllLinear,
-            tip="Fit all linear parameters of enabled components")
-        self.helpAction = self.createAction("&Help", 
-            shortcut='F1', slot=self.show_help, 
-            tip='Brief help information')
-        self.aboutAction = self.createAction("&About", 
-            slot=self.on_about, 
-            tip='About the tool')
-        
+        self.fitAction = self.createAction(
+            "&Fit", slot=self.fitComponent, tip="Fit selected components and parameters"
+        )
+        self.fitAllLinearAction = self.createAction(
+            "Fit &all",
+            slot=self.fitAllLinear,
+            tip="Fit all linear parameters of enabled components",
+        )
+        self.helpAction = self.createAction(
+            "&Help", shortcut="F1", slot=self.show_help, tip="Brief help information"
+        )
+        self.aboutAction = self.createAction(
+            "&About", slot=self.on_about, tip="About the tool"
+        )
 
-    def createMenu(self):        
+    def createMenu(self):
         self.file_menu = self.menuBar().addMenu("&File")
-        self.addActions(self.file_menu, 
-            (self.saveAction,self.savePlotAction, None, self.quitAction))
-        
+        self.addActions(
+            self.file_menu,
+            (self.saveAction, self.savePlotAction, None, self.quitAction),
+        )
+
         self.edit_menu = self.menuBar().addMenu("&Edit")
-        self.addActions( self.edit_menu, (self.undoAction, self.redoAction) )
+        self.addActions(self.edit_menu, (self.undoAction, self.redoAction))
 
         self.help_menu = self.menuBar().addMenu("&Help")
-        self.addActions(self.help_menu, (self.helpAction,self.aboutAction))
+        self.addActions(self.help_menu, (self.helpAction, self.aboutAction))
 
     def addActions(self, target, actions):
         for action in actions:
@@ -1040,9 +1148,9 @@ class AppForm(QMainWindow):
             else:
                 target.addAction(action)
 
-    def createAction(  self, text, slot=None, shortcut=None, 
-                        icon=None, tip=None, checkable=False, 
-                        signal="triggered()"):
+    def createAction(
+        self, text, slot=None, shortcut=None, icon=None, tip=None, checkable=False
+    ):
         action = QAction(text, self)
         if icon is not None:
             action.setIcon(QIcon(":/%s.png" % icon))
@@ -1052,60 +1160,79 @@ class AppForm(QMainWindow):
             action.setToolTip(tip)
             action.setStatusTip(tip)
         if slot is not None:
-            self.connect(action, SIGNAL(signal), slot)
+            action.triggered.connect(slot)
         if checkable:
             action.setCheckable(True)
         return action
 
-    def closeEvent( self, event ):
+    def closeEvent(self, event):
         if self.checkSaveModel(canCancel=True):
             event.accept()
         else:
             event.ignore()
 
+
 def main():
-    cfgfile=os.path.splitext(__file__)[0]+'.cfg'
-    usercfg='~/.'+os.path.basename(cfgfile)
+    cfgfile = os.path.splitext(__file__)[0] + ".cfg"
+    usercfg = "~/." + os.path.basename(cfgfile)
     if os.path.exists(usercfg):
-        cfgfile=usercfg
-    usercfg=os.path.basename(cfgfile)
+        cfgfile = usercfg
+    usercfg = os.path.basename(cfgfile)
     if os.path.exists(usercfg):
-        cfgfile=usercfg
-    parser=argparse.ArgumentParser(description='View and update GNSS time series models')
-    parser.add_argument('config_file',nargs='?',help='Station prediction model XML file')
-    parser.add_argument('-c','--example-config_file',action='store_true',help='Print an example configuration file')
-    parser.add_argument('-m','--model_file',help='Default file name for the model file - can include {code}')
-    parser.add_argument('-t','--timeseries_file',help='Timeseries file name (append :type for solution type)')
-    parser.add_argument('-a','--after',help='Only use data after date (YYYY-MM-DD)')
-    parser.add_argument('-b','--before',help='Only use data before date (YYYY-MM-DD)')
+        cfgfile = usercfg
+    parser = argparse.ArgumentParser(
+        description="View and update GNSS time series models"
+    )
+    parser.add_argument(
+        "config_file", nargs="?", help="Station prediction model XML file"
+    )
+    parser.add_argument(
+        "-c",
+        "--example-config_file",
+        action="store_true",
+        help="Print an example configuration file",
+    )
+    parser.add_argument(
+        "-m",
+        "--model_file",
+        help="Default file name for the model file - can include {code}",
+    )
+    parser.add_argument(
+        "-t",
+        "--timeseries_file",
+        help="Timeseries file name (append :type for solution type)",
+    )
+    parser.add_argument("-a", "--after", help="Only use data after date (YYYY-MM-DD)")
+    parser.add_argument("-b", "--before", help="Only use data before date (YYYY-MM-DD)")
 
-    args=parser.parse_args()
+    args = parser.parse_args()
 
-    options={}
+    options = {}
     if args.example_config_file:
-        examplefile=os.path.splitext(__file__)[0]+'.cfg'
+        examplefile = os.path.splitext(__file__)[0] + ".cfg"
         with open(examplefile) as f:
             print(f.read())
         sys.exit()
 
     if args.config_file:
-        cfgfile=args.config_file
+        cfgfile = args.config_file
     if args.model_file:
-        options['model_file']=args.default_model_file
+        options["model_file"] = args.default_model_file
     if args.timeseries_file:
-        parts=args.timeseries_file.split(':')
-        options['timeseries_file']=parts[0]
+        parts = args.timeseries_file.split(":")
+        options["timeseries_file"] = parts[0]
         if len(parts) > 1:
-            options['timeseries_type']=parts[1]
+            options["timeseries_type"] = parts[1]
     if args.after:
-        options['after']=args.after
+        options["after"] = args.after
     if args.before:
-        options['before']=args.before
+        options["before"] = args.before
 
     app = QApplication(sys.argv)
-    form = AppForm(cfgfile=cfgfile,options=options)
+    form = AppForm(cfgfile=cfgfile, options=options)
     form.show()
     app.exec_()
+
 
 if __name__ == "__main__":
     main()
