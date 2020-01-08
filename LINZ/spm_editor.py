@@ -411,7 +411,9 @@ class AppForm(QMainWindow):
                 set_model_start_date
                 catalog""".split()
         }
-        if cfgfile and os.path.exists(cfgfile):
+        if cfgfile:
+            if not os.path.exists(cfgfile):
+                raise RuntimeError("Cannot open configuration file {0}".format(cfgfile))
             with open(cfgfile) as cfg:
                 for l in cfg:
                     if re.match(r"^\s*(\#|$)", l):
@@ -454,12 +456,17 @@ class AppForm(QMainWindow):
         self.outlier_test_range = float(config.get("outlier_test_range", "10.0"))
         solutiontypes = config.get("timeseries_type", "")
         self.solutiontypes = solutiontypes
-        self.timeseries_list = TimeseriesList(
-            self.timeseries_file,
-            solutiontypes or None,
-            after=config.get("after"),
-            before=config.get("before"),
-        )
+        try:
+            self.timeseries_list = TimeseriesList(
+                self.timeseries_file,
+                solutiontypes or None,
+                after=config.get("after"),
+                before=config.get("before"),
+            )
+        except Exception as ex:
+            self.timeseries_list=[]
+            errmsg="Time series configuration file error\n"+str(ex)
+            raise RuntimeError(errmsg)
         catalog_file = config.get("catalog")
         if catalog_file is None:
             catalog_file = re.sub(r"(\.cfg)?$", ".catalog", cfgfile, re.I)
@@ -1184,7 +1191,7 @@ def main():
         description="View and update GNSS time series models"
     )
     parser.add_argument(
-        "config_file", nargs="?", help="Station prediction model XML file"
+        "config_file", nargs="?", help="Configuration file name"
     )
     parser.add_argument(
         "-c",
@@ -1228,10 +1235,13 @@ def main():
     if args.before:
         options["before"] = args.before
 
-    app = QApplication(sys.argv)
-    form = AppForm(cfgfile=cfgfile, options=options)
-    form.show()
-    app.exec_()
+    try:
+        app = QApplication(sys.argv)
+        form = AppForm(cfgfile=cfgfile, options=options)
+        form.show()
+        app.exec_()
+    except Exception as ex:
+        print(str(ex))
 
 
 if __name__ == "__main__":
