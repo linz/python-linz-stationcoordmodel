@@ -67,7 +67,7 @@ class Updates(object):
         if not os.path.isfile(self._csvFile):
             return
         self.updates = {}
-        with open(self._csvFile, "rb") as csvfh:
+        with open(self._csvFile, "r") as csvfh:
             reader = csv.DictReader(csvfh)
             fieldnames = reader.fieldnames
             if fieldnames is None:
@@ -101,7 +101,7 @@ class Updates(object):
 
     def save(self, filename=None):
         filename = filename if filename is not None else self._csvFile
-        with open(filename, "wb") as csvfh:
+        with open(filename, "w") as csvfh:
             writer = csv.writer(csvfh)
             writer.writerow(Updates.columns)
             for update in [self.updates[k] for k in sorted(self.updates.keys())]:

@@ -204,7 +204,7 @@ def main():
             calcdates = outputfiles[output_csv_file]
             ncoord = 0
             buildfile = output_csv_file + ".temp"
-            with open(buildfile, "wb") as csvf:
+            with open(buildfile, "w") as csvf:
                 writer = csv.writer(csvf)
                 header = "code epoch".split()
                 if nzgd2000_version:

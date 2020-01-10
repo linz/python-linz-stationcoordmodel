@@ -19,7 +19,8 @@ Recommends:
   python3-numpy,
   python3-matplotlib,
   python3-scipy,
-  python3-linz-geodetic
+  python3-linz-geodetic,
+  python3-linz-deformationmodel
 Description: Python LINZ station_coord_model
  Tools for calculating and manage the station coordinate models, models of 
  CORS station time series
