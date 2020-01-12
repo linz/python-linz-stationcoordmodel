@@ -266,7 +266,7 @@ def main():
                 os.rename(buildfile, output_csv_file)
 
     except RuntimeError as e:
-        print(e.message)
+        print(e)
 
 
 if __name__ == "__main__":

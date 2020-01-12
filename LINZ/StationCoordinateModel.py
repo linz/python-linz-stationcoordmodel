@@ -1779,7 +1779,7 @@ def clean():
             scm.clearExcludedObs()
             scm.save(updateAvailability="clear", keepVersionDate=True)
         except Exception as ex:
-            print("Failed for {0}: {1}\n".format(scmf, ex.message))
+            print("Failed for {0}: {1}\n".format(scmf, ex))
 
 
 def main():

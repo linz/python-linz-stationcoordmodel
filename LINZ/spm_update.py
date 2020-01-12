@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 Recalculation of station coordinate model from time series
 """
@@ -274,7 +274,7 @@ class StationCoordModelUpdater(object):
             if not self.testonly:
                 self.saveModel()
         except RuntimeError as ex:
-            print("Station {0}: {1}".format(code, ex.message))
+            print("Station {0}: {1}".format(code, ex))
             return False
         return True
 
