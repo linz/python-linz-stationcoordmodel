@@ -1818,7 +1818,7 @@ def main():
         "-x", "--calc-xyz", action="store_true", help="Calculate XYZ instead of enu"
     )
     parser.add_argument(
-        "-i", "--increment_days", type=int, help="Increment in days for calculation"
+        "-i", "--increment_days", type=int, default=1, help="Increment in days for calculation"
     )
     parser.add_argument(
         "-d", "--debug-calcs", action="store_true", help="Print individual components"
