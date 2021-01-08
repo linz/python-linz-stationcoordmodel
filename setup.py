@@ -71,11 +71,8 @@ setup(
     # have to be included in MANIFEST.in as well.
     package_data={
         "LINZ": [
-            "spm_editor.cfg",
             "CORS_Analyst.cfg",
             "report_datum_status.cfg",
-            "spm_editor_help.html",
-            "spm_editor.png",
         ]
     },
     # Namespace package - other modules may include into these packages
@@ -87,7 +84,6 @@ setup(
         "console_scripts": [
             "calc_refstation_coords=LINZ.calc_refstation_coords:main",
             "station_coord_model=LINZ.StationCoordinateModel:main",
-            "spm_editor=LINZ.spm_editor:main",
             "spm_update=LINZ.spm_update:main",
             "spm_clean=LINZ.StationCoordinateModel:clean",
             "analyse_cors=LINZ.CORS_Analyst:main",
