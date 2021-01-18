@@ -882,7 +882,7 @@ class exponential_decay(base_function):
 
     def calc(self, date):
         y = self._dateOffset(date) / self._param[3]
-        y = np.maximum(0, 1.0 - np.exp(-y))
+        y = 1.0 - np.exp(np.minimum(0.0,-y))
         return y.dot([self._param[:3]])
 
     def setDuration(self, decay, fixed=True):
