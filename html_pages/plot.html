@@ -55,6 +55,8 @@
 
     var addCorsData=function(corsdata)
     {
+        $("#plot_loading").hide();
+        $("#plot_area").show();
         g_corsdata=corsdata;
         if( g_bsldata !== null )
         {
@@ -195,8 +197,15 @@ Status
 at <span class="stn-template" id="offset_test_date"></span>.
 </p>
 <p class="alert"><span class="stn-template" id="gdb_offset.status_message"></span>
+
 <span class="stn-template" id="scm_offset.status_message"></span></p>
-  <div id="error" class="error"></div>
+
+<div id="error" class="error"></div>
+<div id="plot_loading">
+    <p id="plot_status">Loading data for <span class="tn-template" id="code"></span> ...</p>
+</div>
+<div id="plot_area" style="display:none">
+
   <div class="container-fluid">
 
       <div class='col-md-12'>
@@ -226,5 +235,6 @@ at <span class="stn-template" id="offset_test_date"></span>.
   </div>
   <p><label>Detrended <input type="checkbox" id="remove_trend_checkbox" checked="checked"/></label> Drag across graph to zoom in. Double click graph to zoom back out</p>
 <p class="acknowledgement">Plotting thanks to the <a href="http://dygraphs.com">dygraphs</a> javascript library</p>
+</div>
 </body>
 </html>

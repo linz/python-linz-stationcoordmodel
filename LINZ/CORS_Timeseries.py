@@ -3,6 +3,7 @@ import os
 import os.path
 import re
 import sqlite3
+import json
 
 import numpy as np
 import datetime as dt
@@ -64,7 +65,11 @@ def findOutliers(enu_data, ndays=10, tolerance=5.0, percentile=95.0, goodrows=Fa
         rows = np.where(np.any(np.abs(obs - medians) > rse * tolerance, axis=1))
     return idx[rows]
 
-
+def normalizeSolutionType( solutiontype ):
+    if isinstance(solutiontype,list):
+        solutiontype='+'.join(solutiontype)
+    return solutiontype
+    
 class Timeseries(object):
     def __init__(
         self,
@@ -100,7 +105,7 @@ class Timeseries(object):
         self._loaded = False
         self._isfunction = False
         self._code = code
-        self._solutiontype = solutiontype
+        self._solutiontype = normalizeSolutionType(solutiontype)
         self._xyz0 = xyz0
         self._xyzenu = xyzenu
         self._transform = transform
@@ -243,7 +248,7 @@ class Timeseries(object):
         self._load()
         cols = ("e", "n", "u") if enu else ("x", "y", "z")
         data = self.getData(enu=enu, detrend=detrend, normalize=normalize, index=index)
-        return data.index.to_pydatetime(), np.vstack((data[x] for x in cols)).T
+        return data.index.to_pydatetime(), np.vstack([data[x] for x in cols]).T
 
     def getData(self, enu=True, detrend=False, index=None, normalize=False):
         """ 
@@ -745,6 +750,177 @@ class SqliteTimeseries(Timeseries):
         return data
 
 
+
+class PgTimeseries(Timeseries):
+    '''
+    Postgres time series.  Assumes data are held in a table coords with columns
+    solution_id (identifies calc date SINEX file from which solutions loaded)
+    solution_type (string defining solution type)
+    code (mark id)
+    epoch (date/time of calculated coordinate)
+    x,y,z (ordinates)
+
+    Assumes connection details are defined in environment variables.
+    '''
+
+    _sql = """
+        with p as (
+            select 
+               %s as solution_type,
+               %s as code,
+               %s::timestamp without time zone as min_epoch,
+               %s::timestamp without time zone as max_epoch
+        )
+        select DISTINCT ON (date(epoch))
+           to_char(epoch,'YYYY-MM-DD') as epoch, 
+           X as x, Y as y, Z as z 
+        from coords c, p
+        where 
+           c.code=p.code and 
+           c.solution_type=p.solution_type and
+           (p.min_epoch IS NULL OR epoch >= p.min_epoch) and
+           (p.max_epoch IS NULL OR epoch <= p.max_epoch)
+        order by date(epoch),solution_id DESC
+        """
+
+    _sqlMultiType = """
+            with p as (
+            select 
+               %s as solution_type,
+               %s as code,
+               %s::timestamp without time zone as min_epoch,
+               %s::timestamp without time zone as max_epoch
+        ),
+        solns as (
+            select 
+                epoch, 
+                c.solution_type, 
+                solution_id,
+                X as x, Y as y, Z as z, 
+                CASE c.solution_type WHEN NULL THEN NULL {case} ELSE NULL END as priority
+            from coords c, p
+            where 
+            c.code=p.code and 
+           (p.min_epoch IS NULL OR epoch >= p.min_epoch) and
+           (p.max_epoch IS NULL OR epoch <= p.max_epoch)
+        )
+        select 
+            distinct on (date(epoch))
+            to_char(epoch,'YYYY-MM-DD') as epoch,
+            solution_type,
+            x, y, z
+        from
+            solns
+        where 
+            priority is not NULL
+        order by
+            date(epoch),priority,solution_id DESC
+        """
+
+    _sqlList = """
+        select distinct code, solution_type
+        from coords
+        order by code, solution_type
+        """
+
+    @staticmethod
+    def _openDb(source):
+        import psycopg2
+        source=source or ""
+        if source.startswith('pg:'):
+            source=source[3:]
+        if source == "":
+            dbname=os.environ.get('PGDATABASE')
+            if dbname is None:
+                raise RuntimeError("Postgres database not defined by environment variables")
+            source="dbname="+dbname
+        elif '=' not in source:
+            source="dbname="+source
+        try:
+            db = psycopg2.connect(source)
+        except:
+            raise RuntimeError(f"Cannot connect to database {source}")            
+        return db
+
+    @staticmethod
+    def seriesList(source=None, solutiontype=None, after=None, before=None, normalize=False):
+        db = PgTimeseries._openDb(source)
+        seriescodes = pd.read_sql(PgTimeseries._sqlList, db)
+        db.close()
+        series = []
+        found = []
+        stypes = solutiontype.split("+") if solutiontype else None
+        for i in seriescodes.index:
+            code, solntype = (seriescodes.code[i], seriescodes.solution_type[i])
+            if stypes is None or solntype in stypes:
+                solntype = solutiontype or solntype
+                if (code, solntype) in found:
+                    continue
+                series.append(
+                    PgTimeseries(
+                        source,
+                        code,
+                        solntype,
+                        after=after,
+                        before=before,
+                        normalize=normalize,
+                    )
+                )
+                found.append((code, solntype))
+        return series
+
+    def __init__(
+        self,
+        source,
+        code,
+        solutiontype="default",
+        xyz0=None,
+        transform=None,
+        after=None,
+        before=None,
+        normalize=False,
+    ):
+        Timeseries.__init__(
+            self,
+            code,
+            solutiontype=solutiontype,
+            xyz0=xyz0,
+            transform=transform,
+            after=after,
+            before=before,
+            normalize=normalize,
+        )
+        self._source=source
+
+    def _loadData(self):
+        db = PgTimeseries._openDb(self._source)
+        solntype = self.solutiontype()
+        code = self.code()
+        if '+' not in solntype:
+            sql = PgTimeseries._sql
+        else:
+            types = solntype.split("+")
+            solntype=None
+            casesql = ""
+            for i, t in enumerate(types):
+                t=t.replace("'","''")
+                casesql = casesql + f" WHEN '{t}' THEN {i}"
+            sql = PgTimeseries._sqlMultiType
+            sql = sql.replace("{case}", casesql)
+
+        minepoch=None
+        maxepoch=None
+        if self._before is not None:
+            maxepoch=self._before.strftime("%Y-%m-%d")
+        if self._after is not None:
+            minepoch=self._after.strftime("%Y-%m-%d")
+        params=[solntype,code, minepoch,maxepoch ]
+        data = pd.read_sql(sql, db, params=params, index_col="epoch")
+        db.close()
+        data.set_index(pd.to_datetime(data.index), inplace=True)
+        return data
+
+
 class FileTimeseries(Timeseries):
 
     """
@@ -970,11 +1146,11 @@ class FunctionTimeseries(Timeseries):
 
 class TimeseriesList(object):
     def __init__(
-        self, source=None, solutiontype=None, after=None, before=None, normalize=False
+        self, source=None, solutiontype=None, after=None, before=None, normalize=False, series=None
     ):
-        series = []
-        self._series = series
-        if source is not None:
+        self._get=None
+        if source is not None and series is None:
+            series=[]
             if "{code}" in source:
                 series.extend(
                     FileTimeseries.seriesList(
@@ -985,6 +1161,16 @@ class TimeseriesList(object):
                         normalize=normalize,
                     )
                 )
+                self._get=lambda code,**params: FileTimeseries(source=source,code=code,normalize=normalize,**params)  
+            elif source.startswith("pg:"):
+                series.extend(PgTimeseries.seriesList(
+                        source[3:],
+                        solutiontype,
+                        after=after,
+                        before=before,
+                        normalize=normalize,                    
+                ))
+                self._get=lambda code,**params: PgTimeseries(source=source,code=code,normalize=normalize,**params)
             else:
                 series.extend(
                     SqliteTimeseries.seriesList(
@@ -995,6 +1181,8 @@ class TimeseriesList(object):
                         normalize=normalize,
                     )
                 )
+                self._get=lambda code,**params: SqliteTimeseries(source=source,code=code,normalize=normalize,**params)                
+        self._series = series
 
     def codes(self):
         codes = {}
@@ -1021,32 +1209,27 @@ class TimeseriesList(object):
         as yyyy-mm-dd.
         """
         if isinstance(solutiontype, str):
-            solutiontype = [solutiontype]
-        potential = None
-        priority = len(solutiontype)
-        ambiguous = False
+            solutiontype = solutiontype.split('+')
+        series_types=[]
+        baseseries=None
         for series in self._series:
             if series.code() != code:
                 continue
-            if len(solutiontype) > 0:
-                solntype = series.solutiontype()
-                if solntype in solutiontype:
-                    spriority = solutiontype.index(solntype)
-                    if spriority < priority:
-                        potential = series
-                        priority = spriority
-            elif potential is None:
-                potential = series
-            else:
-                ambiguous = True
-        if ambiguous:
+            baseseries=series
+            series_types.append(series.solutiontype())
+        if len(solutiontype) > 0:
+            series_types=[s for s in series_types if s in solutiontype]
+        elif len(series_types) > 1:
             raise RuntimeError(
-                "Ambiguous time series requested - multiple solution types"
+                "Ambiguous time series requested - multiple possible solution types"
             )
-        if not potential:
-            raise RuntimeError("No time series found for requested station " + code)
-        potential.setDateRange(before=before, after=after)
-        return potential
+        if len(series_types) == 0:
+            raise RuntimeError(
+                "Invalid code/solution type requested - no matching time series found"
+            )
+        if self._get is not None:
+            return self._get(code,solutiontype=series_types,after=after,before=before)
+        return baseseries
 
     def compareWith(self, other, after=None, before=None, normalize=False):
         """

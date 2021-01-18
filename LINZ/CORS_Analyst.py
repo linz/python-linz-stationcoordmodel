@@ -1,11 +1,16 @@
 import sys
 import os.path
-from datetime import datetime
-from collections import namedtuple
+import shutil
+import urllib.request
 import json
-from configparser import SafeConfigParser
+import re
+import tempfile
+import zipfile
 import numpy as np
 import pandas as pd
+from datetime import datetime
+from collections import namedtuple
+from configparser import SafeConfigParser
 from pandas.tseries.offsets import DateOffset
 
 from LINZ.Geodetic import GDB
@@ -20,12 +25,12 @@ StationData = namedtuple(
 StationOffsetStats = namedtuple("StationOffsetStats", "date gdbOffset scmOffset")
 RefCoordinateDate = datetime(2018, 1, 1)
 
-
 class CORS_Analyst(object):
 
     refconfigfile = os.path.splitext(__file__)[0] + ".cfg"
     configfile = os.path.basename(refconfigfile)
     configgroup = "analysis_settings"
+    httpre=re.compile(r'^https?\:\/\/')
 
     def __init__(
         self,
@@ -39,6 +44,7 @@ class CORS_Analyst(object):
         self._writecsv = write_plot_files
         self._configfile = configfile or CORS_Analyst.configfile
         self._configgroup = configgroup or CORS_Analyst.configgroup
+        self._tempdirs=[]
 
         if not os.path.exists(self._configfile):
             sys.stderr.write(
@@ -55,10 +61,12 @@ class CORS_Analyst(object):
             cfg.set("DEFAULT", k, v)
         self._cfg = cfg
         self._tsdb = cfg.get(self._configgroup, "timeseries_database")
-        if not os.path.exists(self._tsdb):
-            raise RuntimeError("Time series database " + self._tsdb + " does not exist")
         self._tssolutiontype = cfg.get(self._configgroup, "timeseries_solution_type")
+        self._tslist = CORS_Timeseries.TimeseriesList(source=self._tsdb,solutiontype=self._tssolutiontype)
         self._scmpath = cfg.get(self._configgroup, "station_coordinate_model_path")
+        if self.httpre.match(self._scmpath):
+            zipspec,scmfile=self._scmpath.rsplit('/',maxsplit=1)
+            self._scmpath=self.downloadZipFile(zipspec)+"/"+scmfile
         self._offsetdays = cfg.getint(self._configgroup, "offset_calc_ndays")
         self._teststat = cfg.get(self._configgroup, "offset_test_stat")
         self._gdbwarning = self.loadWarningLevels("gdb_offset_warning")
@@ -79,8 +87,35 @@ class CORS_Analyst(object):
             )
         return levels
 
+    def downloadZipFile( self, zipfileurl ):
+     
+        try:
+            datapath=None
+            if '+' in zipfileurl:
+                zipfileurl,datapath=zipfileurl.split('+',maxsplit=1)
+            tempdir=tempfile.TemporaryDirectory()
+            data=urllib.request.urlopen(zipfileurl)
+            dirname=tempdir.name
+            zipfilename=os.path.join(dirname,'download.zip')
+            with open(zipfilename,'wb') as zfh:
+                shutil.copyfileobj(data,zfh)
+            with zipfile.ZipFile(zipfilename, 'r') as zf:
+                zf.extractall(dirname)
+            if datapath is not None:
+                dirname=os.path.join(dirname,datapath)
+            if os.path.isdir(dirname):
+                # Ensure temp directory remains for duration of script
+                self._tempdirs.append(tempdir)
+                return dirname
+            raise RuntimeError('Directory {0} not found in zipfile {1}'.format(datapath,zipfileurl))
+        except Exception as e :
+            raise RuntimeError("Failed to download {0}: {1}".format(zipfileurl,e))
+
+
     def loadDeformationModel(self):
         path = self._cfg.get(self._configgroup, "deformation_model_path")
+        if self.httpre.match(path):
+            path=self.downloadZipFile(path)
         self.gdbCalculator = GDB_Timeseries.GDB_Timeseries_Calculator(path)
         self.deformationModelVersion = self.gdbCalculator.deformationModelVersion()
 
@@ -103,9 +138,7 @@ class CORS_Analyst(object):
     def getStationData(self, code):
         # Load the time series
 
-        ts = CORS_Timeseries.SqliteTimeseries(
-            self._tsdb, code, solutiontype=self._tssolutiontype
-        )
+        ts = self._tslist.get(code)
 
         # Define a reference coordinate for the station to apply to the time series
         # (so that we get compatible xyz offsets)
@@ -152,6 +185,7 @@ class CORS_Analyst(object):
         results_dir = self._cfg.get(self._configgroup, "result_path")
         results_file = self._cfg.get(self._configgroup, csv_cfg_type)
         csv_file = os.path.join(results_dir, results_file.replace("{code}", code))
+        self.createFileDirectory(csv_file)
         tsdata.to_csv(csv_file, float_format="%.4f", index_label="epoch")
 
     def roundFloatsInStruct(self, ndp):
@@ -171,8 +205,14 @@ class CORS_Analyst(object):
         results_file = self._cfg.get(self._configgroup, "summary_file")
         json_file = os.path.join(results_dir, results_file)
         rounder = self.roundFloatsInStruct(4)
+        self.createFileDirectory(json_file)
         with open(json_file, "w") as jf:
             jf.write(json.dumps(rounder(results), indent=2, sort_keys=True))
+        
+    def createFileDirectory(self,filename):
+        dirname=os.path.dirname(filename)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
 
     def trimmedModelTimeseries(self, tsdata, precision):
         # Remove redundant data for plotting model time series based
