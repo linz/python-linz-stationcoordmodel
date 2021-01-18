@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> </title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/results.css">  
+  <link rel="stylesheet" href="css/dygraph.css">
+  <script type="text/javascript" src="js/jquery-1.11.3.min.js"></script>
+  <script type="text/javascript" src="js/utils.js"></script>
+  <script type="text/javascript" src="js/sprintf.js"></script>
+  <script type="text/javascript" src="js/config.js"></script>
+  <script>
+
+    var strategy=queryParam('strategy');
+    var year=queryParam('year');
+    var doy=queryParam('doy');
+    var yy=year.substr(2);
+
+    var urlparams={
+        strategy: strategy,
+        year: year,
+        yy: yy,
+        doy: doy,
+        yyyyddd: year + ':' + doy
+
+    };
+
+ var writeProcessingSummary=function(data)
+ {
+    var parts=data.split(/(^\=+\s*\n\s*(PART\s+(\d+)\:.*?)\s*\n\=+\s*$)/m);
+    var sections=$('<ul class="summary_sections">').append($('<a>').attr('name','contents'));
+    var summary=$('<div class="summary_text">');
+    summary.append($('<pre>').text(parts[0]));
+    parts.shift();
+    var prevnav=null;
+    var prevanchor=null;
+    while( parts.length > 3 )
+    {
+        var header=parts.shift();
+        var section=parts.shift();
+        var partno=parts.shift();
+        var content=parts.shift();
+        var anchor='part'+partno;
+        if( prevnav )
+        {
+            prevnav.append(' ',$('<a>').attr('href','#'+anchor).text('Next'));
+        }
+        prevnav=$('<div>').addClass('section_nav');
+        prevnav.append($('<a>').attr('href','#contents').text('Contents'));
+        if( prevanchor )
+        {
+            prevnav.append(' ',$('<a>').attr('href','#'+prevanchor).text('Previous'));
+        }
+        prevanchor=anchor;
+        summary.append($('<a>').attr('name',anchor));
+        summary.append(prevnav);
+        summary.append($('<pre>').text(header+content));
+        sections.append($('<ul>').append($('<a>').attr('href','#'+anchor).text(section)));
+    }
+    $('#procsum').empty();
+    $('#procsum').append(sections,summary);
+ }
+
+ var setupPage=function()
+ {
+     expandTemplateSpans(urlparams)
+     var procfiles=procfiletemplates[strategy];
+     var procsumurl=expandUrlTemplate(procfiles[procsum],urlparams);
+     $.ajax({
+         url: procsumurl,
+         success: writeProcessingSummary,
+         dataType: "text"
+         });
+     var item=$('<ul>').append($('<a>').attr('href',procsumurl).text(procsum));
+     var filelist=$('#filelist');
+     filelist.append(item);
+     var filetypes=Object.keys(procfiles).sort();
+     $.each(filetypes,function(i,ft){
+        if( ft == procsum ) return;
+        var ptemplate=procfiles[ft];
+        var purl=expandUrlTemplate(ptemplate,urlparams);
+        var item=$('<ul>').append($('<a>').attr('href',purl).text(ft));
+        filelist.append(item);
+     });
+     $("#filelist ul a").each(function()
+     {
+         var link=$(this);
+         var href=link.attr('href');
+         var fname=href.replace(/.*\//,'');
+         link.attr('download',fname);
+     });
+    }
+
+$(document).ready(setupPage);
+
+</script>
+</head>
+<body>
+<h1>Processing results for <span class="template" id="strategy"></span> on <span class="template" id="yyyyddd"></span></h1>
+<p></p>
+<h2>Result files</h2>
+<p>The following file can be downloaded:</p>
+<ul id="filelist"></ul>
+<h2>Processing summary</h2>
+<div id="procsum"><p>No results found</p></div>
+</body>
+</html>
