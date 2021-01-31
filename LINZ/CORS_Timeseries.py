@@ -834,6 +834,8 @@ class PgTimeseries(Timeseries):
             if dbname is None:
                 raise RuntimeError("Postgres database not defined by environment variables")
             source="dbname="+dbname
+        elif source.startswith("{"):
+            source=json.decode(source)
         elif '=' not in source:
             source="dbname="+source
         try:
