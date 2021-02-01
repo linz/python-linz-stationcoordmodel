@@ -1,3 +1,11 @@
+python-linz-stationcoordmodel (1.37.0-1) xenial; urgency=medium
+
+  * Avoiding numeric overflow in exponential functions
+  * Adding option for JSON credentials in postgres time series
+  * Adding static web pages for viewing time series results
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Mon, 1 Feb 2021 09:00:00 +1200
+
 python-linz-stationcoordmodel (1.36.0-1) xenial; urgency=medium
 
   * Separated coordinate model editor into

@@ -17,6 +17,7 @@ Depends: ${misc:Depends}, ${python3:Depends},
   python3-numpy,
   python3-linz-deformationmodel
 Recommends:
+  python3-psycopg2,
   python3-scipy,
   python3-matplotlib,
 Description: Python LINZ station_coord_model
