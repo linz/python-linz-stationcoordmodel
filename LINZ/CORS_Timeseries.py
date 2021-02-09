@@ -835,12 +835,16 @@ class PgTimeseries(Timeseries):
                 raise RuntimeError("Postgres database not defined by environment variables")
             source="dbname="+dbname
         elif source.startswith("{"):
-            source=json.decode(source)
+            source=json.loads(source)
         elif '=' not in source:
             source="dbname="+source
         try:
-            db = psycopg2.connect(source)
+            if isinstance(source,str):
+                source={'dsn':source}
+            db = psycopg2.connect(**source)
         except:
+            if 'password' in source:
+                source['password']='...'
             raise RuntimeError(f"Cannot connect to database {source}")            
         return db
 
