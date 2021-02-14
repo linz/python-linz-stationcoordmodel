@@ -899,7 +899,7 @@ class PgTimeseries(Timeseries):
         self._source=source
 
     def _loadData(self):
-        db = PgTimeseries._openDb(self._source)
+        db = self._openDb(self._source)
         solntype = self.solutiontype()
         code = self.code()
         if '+' not in solntype:
@@ -924,6 +924,88 @@ class PgTimeseries(Timeseries):
         data = pd.read_sql(sql, db, params=params, index_col="epoch")
         db.close()
         data.set_index(pd.to_datetime(data.index), inplace=True)
+        return data
+
+
+
+class CoordApiTimeseries(Timeseries):
+    '''
+    Timeseries provide by coordinate API from LINZ AWS linz-gnss-coord-analysis template/stack.
+
+    The API is defined by a url which gives two functions
+
+      {baseurl}/solution_stats [strategy=xxx[+xxx]*] [code=xxxx[+xxxx]*]
+      {baseurl}/coordinate?code=xxxx&strategy=xxx[+xxx]* [from_epoch=YYYY:DDD] [to_epoch=YYYY:DDD]
+    '''
+    @staticmethod
+    def _getData(source,apiquery):
+        import urllib.request
+        if source.startswith('api:'):
+            source=source[4:]
+        url=source+"/"+apiquery
+        try:
+            with urllib.request.urlopen(url) as response:
+                data=json.loads(response.read().decode('utf8'))
+            return data
+        except Exception as ex:
+            raise RuntimeError(f"Failed to load {url}: {ex}")
+
+    @staticmethod
+    def seriesList(source=None, solutiontype=None, after=None, before=None, normalize=False):
+        series = []
+        query="solution_stats"
+        if solutiontype:
+            query=query+f"?strategy={solutiontype}"
+        for strategy in CoordApiTimeseries._getData(source,query)['strategies']:
+            for code in strategy['codes']:
+                series.append(
+                    CoordApiTimeseries(
+                        source,
+                        code['code'],
+                        strategy['strategy'],
+                        after=after,
+                        before=before,
+                        normalize=normalize,
+                    )
+                )
+        return series
+
+    def __init__(
+        self,
+        source,
+        code,
+        solutiontype="default",
+        xyz0=None,
+        transform=None,
+        after=None,
+        before=None,
+        normalize=False,
+    ):
+        Timeseries.__init__(
+            self,
+            code,
+            solutiontype=solutiontype,
+            xyz0=xyz0,
+            transform=transform,
+            after=after,
+            before=before,
+            normalize=normalize,
+        )
+        self._source=source
+
+    def _loadData(self):
+        solntype = self.solutiontype()
+        code = self.code()
+        query=f"coordinates?code={code}&strategy={solntype}"
+        if self._after is not None:
+            query=query+"&from_epoch="+self._after.strftime("%Y:%j")
+        if self._before is not None:
+            query=query+"&to_epoch="+self._before.strftime("%Y:%j")
+        result=self._getData(self._source,query)
+        tsdata=result['data']
+        columns=['solution_type' if c == 'strategy' else c for c in  result['columns']]
+        data=pd.DataFrame(tsdata,columns=columns)
+        data.set_index(pd.to_datetime(data['epoch'],format='%Y:%j'), inplace=True)
         return data
 
 
@@ -1177,6 +1259,15 @@ class TimeseriesList(object):
                         normalize=normalize,                    
                 ))
                 self._get=lambda code,**params: PgTimeseries(source=source,code=code,normalize=normalize,**params)
+            elif source.startswith("api:"):
+                series.extend(CoordApiTimeseries.seriesList(
+                        source[4:],
+                        solutiontype,
+                        after=after,
+                        before=before,
+                        normalize=normalize,                    
+                ))
+                self._get=lambda code,**params: CoordApiTimeseries(source=source,code=code,normalize=normalize,**params)                
             else:
                 series.extend(
                     SqliteTimeseries.seriesList(
