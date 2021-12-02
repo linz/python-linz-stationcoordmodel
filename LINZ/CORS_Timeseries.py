@@ -1249,7 +1249,7 @@ class TimeseriesList(object):
                         normalize=normalize,
                     )
                 )
-                self._get=lambda code,**params: FileTimeseries(source=source,code=code,normalize=normalize,**params)  
+                self._get=lambda code,**params: FileTimeseries(filename=source.replace('{code}',code),code=code,normalize=normalize,**params)  
             elif source.startswith("pg:"):
                 series.extend(PgTimeseries.seriesList(
                         source[3:],
@@ -1278,7 +1278,7 @@ class TimeseriesList(object):
                         normalize=normalize,
                     )
                 )
-                self._get=lambda code,**params: SqliteTimeseries(source=source,code=code,normalize=normalize,**params)                
+                self._get=lambda code,**params: SqliteTimeseries(dbfile=source,code=code,normalize=normalize,**params)                
         self._series = series
 
     def codes(self):

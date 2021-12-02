@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.39.0-1) xenial; urgency=medium
+
+  * fix: FileTimeseries and SqliteTimeseries code errors.
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 3 Dec 2021 09:00:00 +1200
+
 python-linz-stationcoordmodel (1.38.0-1) xenial; urgency=medium
 
   * Adding API based time series
