@@ -1,3 +1,10 @@
+python-linz-stationcoordmodel (1.40.0-1) xenial; urgency=medium
+
+  * fix: Reloading models with xyz0 value set
+  * feat: Optionally delay updating start/end date update so .changed more reliable
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Fri, 4 Feb 2022 12:00:00 +1200
+
 python-linz-stationcoordmodel (1.39.0-1) xenial; urgency=medium
 
   * fix: FileTimeseries and SqliteTimeseries code errors.
