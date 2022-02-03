@@ -1095,6 +1095,7 @@ class Model(object):
         updateAvailability=False,
         updateCheckFunc=None,
         keepVersionDate=False,
+        saveTimeseriesDates=False
     ):
         """
         Save the model.
@@ -1109,6 +1110,7 @@ class Model(object):
                                   If set to true, then the outages will be cleared from the 
                                   model.
             keepVersionDate       Set to true to leave the version date unchanged
+            saveTimeseriesDates   Set the start/end date from the timeseries dates.
         """
         filename = self.getFilename(filename)
         if not filename:
@@ -1118,6 +1120,9 @@ class Model(object):
 
         if not keepVersionDate:
             self.versiondate = datetime.now()
+        if saveTimeseriesDates:
+            self.startdate = self.dates[0]
+            self.enddate = self.dates[-1]            
         root = self.toXmlElement()
         if os.path.exists(filename):
             oldroot = self.readStationXmlFile(filename)
