@@ -106,8 +106,8 @@ class Timeseries(object):
         self._isfunction = False
         self._code = code
         self._solutiontype = normalizeSolutionType(solutiontype)
-        self._xyz0 = xyz0
-        self._xyzenu = xyzenu
+        self._xyz0 = None if xyz0 is None else np.array(xyz0)
+        self._xyzenu = None if xyzenu is None else np.array(xyzenu)
         self._transform = transform
         self._before = None
         self._after = None
@@ -170,6 +170,8 @@ class Timeseries(object):
         self._data = data
 
     def setXyzTransform(self, xyz0=None, xyzenu=None, transform=None):
+        xyz0=None if xyz0 is None else np.array(xyz0)
+        xyzenu=None if xyzenu is None else np.array(xyzenu)
         if xyz0 is not None and (self._xyz0 is None or (self._xyz0 != xyz0).any()):
             self._xyz0 = xyz0
             self._loaded = False
@@ -463,7 +465,7 @@ class Timeseries(object):
             )
         else:
             raise RuntimeError("Invalid value to subtract in Timeseries.subtract")
-        xyz0 = [0, 0, 0]
+        xyz0 = np.array([0, 0, 0])
         xyzenu = self._xyzenu if self._xyzenu is not None else self._xyz0
         return Timeseries(newcode, newtype, data=data, xyz0=xyz0, xyzenu=xyzenu)
 
@@ -932,10 +934,12 @@ class CoordApiTimeseries(Timeseries):
     '''
     Timeseries provide by coordinate API from LINZ AWS linz-gnss-coord-analysis template/stack.
 
-    The API is defined by a url which gives two functions
+    The API is defined by a url which gives two endpoints.  The solutions_stats endpoint is used 
+    to get a list of strategies and codes available from the coordinates endpoint.  (These APIs
+    match those provided by the GNSS processing daily processing on AWS).
 
       {baseurl}/solution_stats [strategy=xxx[+xxx]*] [code=xxxx[+xxxx]*]
-      {baseurl}/coordinate?code=xxxx&strategy=xxx[+xxx]* [from_epoch=YYYY:DDD] [to_epoch=YYYY:DDD]
+      {baseurl}/coordinates?code=xxxx&strategy=xxx[+xxx]* [from_epoch=YYYY:DDD] [to_epoch=YYYY:DDD]
     '''
     @staticmethod
     def _getData(source,apiquery):
