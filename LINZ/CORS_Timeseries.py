@@ -19,7 +19,7 @@ def robustStandardError(obs, percentile=95.0):
 
     Standard errors are estimated using the differences between consecutive elements
     of the time series.  The 95 percentile of the absoluted differences is used as a
-    robust estimator for the 95% cumulative probability (two tailed), so is scaled by 
+    robust estimator for the 95% cumulative probability (two tailed), so is scaled by
     1.96 to get standard error.
     """
 
@@ -40,7 +40,7 @@ def findOutliers(enu_data, ndays=10, tolerance=5.0, percentile=95.0, goodrows=Fa
     (goodrows=False) or of the non-outliers (goodrows=True).  Assumes that enu_data
     is a dataframe with columns e, n, u and a datetime index.
 
-    Based on the difference between the observated value and a local median of 
+    Based on the difference between the observated value and a local median of
     values within ndays of the value being tested.  Outliers are points with an
     E,N, or U value more than tolerance times the robust standard error from the
     median.  The robust standard error is calculated with a specific percentage.
@@ -65,11 +65,13 @@ def findOutliers(enu_data, ndays=10, tolerance=5.0, percentile=95.0, goodrows=Fa
         rows = np.where(np.any(np.abs(obs - medians) > rse * tolerance, axis=1))
     return idx[rows]
 
-def normalizeSolutionType( solutiontype ):
-    if isinstance(solutiontype,list):
-        solutiontype='+'.join(solutiontype)
+
+def normalizeSolutionType(solutiontype):
+    if isinstance(solutiontype, list):
+        solutiontype = "+".join(solutiontype)
     return solutiontype
-    
+
+
 class Timeseries(object):
     def __init__(
         self,
@@ -96,7 +98,7 @@ class Timeseries(object):
                         xyz is a numpy array with shape (n,3)
         xyz0            Reference xyz coordinate for calculated enu components
         xyzenu          Reference xyz coordinate for calculated enu components
-        transform       A transformation function applied to the XYZ coordinates 
+        transform       A transformation function applied to the XYZ coordinates
         after           The earliest date of interest
         before          The latest date of interest
         normalize       Normalize the observation dates
@@ -170,8 +172,8 @@ class Timeseries(object):
         self._data = data
 
     def setXyzTransform(self, xyz0=None, xyzenu=None, transform=None):
-        xyz0=None if xyz0 is None else np.array(xyz0)
-        xyzenu=None if xyzenu is None else np.array(xyzenu)
+        xyz0 = None if xyz0 is None else np.array(xyz0)
+        xyzenu = None if xyzenu is None else np.array(xyzenu)
         if xyz0 is not None and (self._xyz0 is None or (self._xyz0 != xyz0).any()):
             self._xyz0 = xyz0
             self._loaded = False
@@ -253,8 +255,8 @@ class Timeseries(object):
         return data.index.to_pydatetime(), np.vstack([data[x] for x in cols]).T
 
     def getData(self, enu=True, detrend=False, index=None, normalize=False):
-        """ 
-        Returns the time series as a pandas DataFrame. 
+        """
+        Returns the time series as a pandas DataFrame.
 
         Parameters:
             enu         Select the ENU data rather than XYZ (default True)
@@ -291,7 +293,7 @@ class Timeseries(object):
         symbol=None,
         baseplot=None,
         figtitle=True,
-        **kwds
+        **kwds,
     ):
         """
         Plot the time series onto 3 separate graphs
@@ -303,7 +305,7 @@ class Timeseries(object):
            symbol='' to plot using a specified symbol
            figtitle to specify the figure title (None or False for no title)
            baseplot to plot againt a specified baseplot
-           
+
            Additional keywords are passed to the pyplot.subplots function
            call or pyplot.plot call (depending on the keyword, the most common
            plot keywords are passed to plot).
@@ -412,7 +414,7 @@ class Timeseries(object):
                 symbol,
                 label=self._code + " " + self._solutiontype,
                 picker=5,
-                **plotkwds
+                **plotkwds,
             )
             if not havebase:
                 plots[i].set_ylabel(ylabel)
@@ -471,8 +473,8 @@ class Timeseries(object):
 
     def resample(self, rule, normalize=True, how=None):
         """
-        Resamples the time series using pd.DataFrame.resample.  
-        
+        Resamples the time series using pd.DataFrame.resample.
+
         rule can be one of the pandas.tseries rules such as M (month), Y (year), or an integer
         number, meaning a number of days
 
@@ -498,7 +500,7 @@ class Timeseries(object):
     def robustStandardError(self, percentile=95.0):
         """
         Returns the "robust standard error" of the time series E,N,U components
-        as a numpy array. 
+        as a numpy array.
         """
         return robustStandardError(self.getObs()[1], percentile)
 
@@ -540,11 +542,11 @@ class Timeseries(object):
 
     def offsetBy(self, offset):
         """
-        Returns a new Timeseries created by adding an offset to the 
+        Returns a new Timeseries created by adding an offset to the
         time series.
-        
+
         The offset can be an [x,y,z] vector, or a time indexed
-        data frame of x, y, z values.  In the latter case common times 
+        data frame of x, y, z values.  In the latter case common times
         are included in the final data.
         """
         data = self.getData(enu=False)
@@ -554,8 +556,8 @@ class Timeseries(object):
 
     def usingData(self, data):
         """
-        Returns a copy of the current time series but using data 
-        specified.  Keeps code, solutiontype, xyz0, xyzenu.  
+        Returns a copy of the current time series but using data
+        specified.  Keeps code, solutiontype, xyz0, xyzenu.
         Discards transform.
         """
         result = Timeseries(
@@ -752,9 +754,8 @@ class SqliteTimeseries(Timeseries):
         return data
 
 
-
 class PgTimeseries(Timeseries):
-    '''
+    """
     Postgres time series.  Assumes data are held in a table coords with columns
     solution_id (identifies calc date SINEX file from which solutions loaded)
     solution_type (string defining solution type)
@@ -763,9 +764,9 @@ class PgTimeseries(Timeseries):
     x,y,z (ordinates)
 
     Assumes connection details are defined in environment variables.
-    '''
+    """
 
-    _sql = """
+    GetCoordinatesSql = """
         with p as (
             select 
                %s as solution_type,
@@ -785,7 +786,7 @@ class PgTimeseries(Timeseries):
         order by date(epoch),solution_id DESC
         """
 
-    _sqlMultiType = """
+    GetMultiSolutionCoordinatesSql = """
             with p as (
             select 
                %s as solution_type,
@@ -793,14 +794,21 @@ class PgTimeseries(Timeseries):
                %s::timestamp without time zone as min_epoch,
                %s::timestamp without time zone as max_epoch
         ),
+        stypes as (
+            select
+                s as solution_type,
+                array_position(string_to_array((select solution_type from p),'+'),s) as priority
+            from
+                unnest(string_to_array((select solution_type from p),'+')) s
+        ),
         solns as (
             select 
                 epoch, 
                 c.solution_type, 
                 solution_id,
                 X as x, Y as y, Z as z, 
-                CASE c.solution_type WHEN NULL THEN NULL {case} ELSE NULL END as priority
-            from coords c, p
+                stypes.priority
+            from p, coords c join stypes on c.solution_type=stypes.solution_type
             where 
             c.code=p.code and 
            (p.min_epoch IS NULL OR epoch >= p.min_epoch) and
@@ -819,7 +827,7 @@ class PgTimeseries(Timeseries):
             date(epoch),priority,solution_id DESC
         """
 
-    _sqlList = """
+    GetCodeSolutionTypeSql = """
         select distinct code, solution_type
         from coords
         order by code, solution_type
@@ -828,32 +836,37 @@ class PgTimeseries(Timeseries):
     @staticmethod
     def _openDb(source):
         import psycopg2
-        source=source or ""
-        if source.startswith('pg:'):
-            source=source[3:]
+
+        source = source or ""
+        if source.startswith("pg:"):
+            source = source[3:]
         if source == "":
-            dbname=os.environ.get('PGDATABASE')
+            dbname = os.environ.get("PGDATABASE")
             if dbname is None:
-                raise RuntimeError("Postgres database not defined by environment variables")
-            source="dbname="+dbname
+                raise RuntimeError(
+                    "Postgres database not defined by environment variables"
+                )
+            source = "dbname=" + dbname
         elif source.startswith("{"):
-            source=json.loads(source)
-        elif '=' not in source:
-            source="dbname="+source
+            source = json.loads(source)
+        elif "=" not in source:
+            source = "dbname=" + source
         try:
-            if isinstance(source,str):
-                source={'dsn':source}
+            if isinstance(source, str):
+                source = {"dsn": source}
             db = psycopg2.connect(**source)
         except:
-            if 'password' in source:
-                source['password']='...'
-            raise RuntimeError(f"Cannot connect to database {source}")            
+            if "password" in source:
+                source["password"] = "..."
+            raise RuntimeError(f"Cannot connect to database {source}")
         return db
 
     @staticmethod
-    def seriesList(source=None, solutiontype=None, after=None, before=None, normalize=False):
+    def seriesList(
+        source=None, solutiontype=None, after=None, before=None, normalize=False
+    ):
         db = PgTimeseries._openDb(source)
-        seriescodes = pd.read_sql(PgTimeseries._sqlList, db)
+        seriescodes = pd.read_sql(PgTimeseries.GetCodeSolutionTypeSql, db)
         db.close()
         series = []
         found = []
@@ -898,75 +911,71 @@ class PgTimeseries(Timeseries):
             before=before,
             normalize=normalize,
         )
-        self._source=source
+        self._source = source
 
     def _loadData(self):
         db = self._openDb(self._source)
         solntype = self.solutiontype()
         code = self.code()
-        if '+' not in solntype:
-            sql = PgTimeseries._sql
+        if "+" not in solntype:
+            sql = PgTimeseries.GetCoordinatesSql
         else:
-            types = solntype.split("+")
-            solntype=None
-            casesql = ""
-            for i, t in enumerate(types):
-                t=t.replace("'","''")
-                casesql = casesql + f" WHEN '{t}' THEN {i}"
-            sql = PgTimeseries._sqlMultiType
-            sql = sql.replace("{case}", casesql)
+            sql = PgTimeseries.GetMultiSolutionCoordinates.SQL
 
-        minepoch=None
-        maxepoch=None
+        minepoch = None
+        maxepoch = None
         if self._before is not None:
-            maxepoch=self._before.strftime("%Y-%m-%d")
+            maxepoch = self._before.strftime("%Y-%m-%d")
         if self._after is not None:
-            minepoch=self._after.strftime("%Y-%m-%d")
-        params=[solntype,code, minepoch,maxepoch ]
+            minepoch = self._after.strftime("%Y-%m-%d")
+        params = [solntype, code, minepoch, maxepoch]
         data = pd.read_sql(sql, db, params=params, index_col="epoch")
         db.close()
         data.set_index(pd.to_datetime(data.index), inplace=True)
         return data
 
 
-
 class CoordApiTimeseries(Timeseries):
-    '''
+    """
     Timeseries provide by coordinate API from LINZ AWS linz-gnss-coord-analysis template/stack.
 
-    The API is defined by a url which gives two endpoints.  The solutions_stats endpoint is used 
+    The API is defined by a url which gives two endpoints.  The solutions_stats endpoint is used
     to get a list of strategies and codes available from the coordinates endpoint.  (These APIs
     match those provided by the GNSS processing daily processing on AWS).
 
       {baseurl}/solution_stats [strategy=xxx[+xxx]*] [code=xxxx[+xxxx]*]
       {baseurl}/coordinates?code=xxxx&strategy=xxx[+xxx]* [from_epoch=YYYY:DDD] [to_epoch=YYYY:DDD]
-    '''
+    """
+
     @staticmethod
-    def _getData(source,apiquery):
+    def _getData(source, apiquery):
         import urllib.request
-        if source.startswith('api:'):
-            source=source[4:]
-        url=source+"/"+apiquery
+
+        if source.startswith("api:"):
+            source = source[4:]
+        url = source + "/" + apiquery
         try:
             with urllib.request.urlopen(url) as response:
-                data=json.loads(response.read().decode('utf8'))
+                data = json.loads(response.read().decode("utf8"))
             return data
         except Exception as ex:
             raise RuntimeError(f"Failed to load {url}: {ex}")
 
     @staticmethod
-    def seriesList(source=None, solutiontype=None, after=None, before=None, normalize=False):
+    def seriesList(
+        source=None, solutiontype=None, after=None, before=None, normalize=False
+    ):
         series = []
-        query="solution_stats"
+        query = "solution_stats"
         if solutiontype:
-            query=query+f"?strategy={solutiontype}"
-        for strategy in CoordApiTimeseries._getData(source,query)['strategies']:
-            for code in strategy['codes']:
+            query = query + f"?strategy={solutiontype}"
+        for strategy in CoordApiTimeseries._getData(source, query)["strategies"]:
+            for code in strategy["codes"]:
                 series.append(
                     CoordApiTimeseries(
                         source,
-                        code['code'],
-                        strategy['strategy'],
+                        code["code"],
+                        strategy["strategy"],
                         after=after,
                         before=before,
                         normalize=normalize,
@@ -995,21 +1004,21 @@ class CoordApiTimeseries(Timeseries):
             before=before,
             normalize=normalize,
         )
-        self._source=source
+        self._source = source
 
     def _loadData(self):
         solntype = self.solutiontype()
         code = self.code()
-        query=f"coordinates?code={code}&strategy={solntype}"
+        query = f"coordinates?code={code}&strategy={solntype}"
         if self._after is not None:
-            query=query+"&from_epoch="+self._after.strftime("%Y:%j")
+            query = query + "&from_epoch=" + self._after.strftime("%Y:%j")
         if self._before is not None:
-            query=query+"&to_epoch="+self._before.strftime("%Y:%j")
-        result=self._getData(self._source,query)
-        tsdata=result['data']
-        columns=['solution_type' if c == 'strategy' else c for c in  result['columns']]
-        data=pd.DataFrame(tsdata,columns=columns)
-        data.set_index(pd.to_datetime(data['epoch'],format='%Y:%j'), inplace=True)
+            query = query + "&to_epoch=" + self._before.strftime("%Y:%j")
+        result = self._getData(self._source, query)
+        tsdata = result["data"]
+        columns = ["solution_type" if c == "strategy" else c for c in result["columns"]]
+        data = pd.DataFrame(tsdata, columns=columns)
+        data.set_index(pd.to_datetime(data["epoch"], format="%Y:%j"), inplace=True)
         return data
 
 
@@ -1018,14 +1027,14 @@ class FileTimeseries(Timeseries):
     """
     Defines a CORS time series from a file for analysis.
 
-    Assumes the time series file has columns name, epoch, x, y, z and is 
-    whitespace delimited.  
+    Assumes the time series file has columns name, epoch, x, y, z and is
+    whitespace delimited.
 
-    The xyz0 parameter can define a reference point used for calculating e, n, u 
+    The xyz0 parameter can define a reference point used for calculating e, n, u
     components.  The default is to use the first coordinate.
 
-    The transform argument can define a function which is applied to each coordinate 
-    as it is read.  The transform function is called for each coordinate as 
+    The transform argument can define a function which is applied to each coordinate
+    as it is read.  The transform function is called for each coordinate as
 
     xyz=transform(xyz,epoch)
 
@@ -1042,7 +1051,7 @@ class FileTimeseries(Timeseries):
         filepattern, solutiontype="default", after=None, before=None, normalize=False
     ):
         """
-        Get the potential time series files, any file matching the filepattern.  The 
+        Get the potential time series files, any file matching the filepattern.  The
         pattern can include {code} in the filename to represent the code to use
         """
         path, file = os.path.split(filepattern)
@@ -1203,7 +1212,7 @@ class FunctionTimeseries(Timeseries):
         Set the dates at which the function timeseries will be calculated.
         Can initiallize with start and end dates (after=, before=), and existing pd.DateTimeIndex
         (index=..) optionally with fillDays to fill missing days in the time series, or with an array
-        of dates (dates=[...]). 
+        of dates (dates=[...]).
         """
 
         self.setDateRange(reset=True, after=after, before=before)
@@ -1238,11 +1247,17 @@ class FunctionTimeseries(Timeseries):
 
 class TimeseriesList(object):
     def __init__(
-        self, source=None, solutiontype=None, after=None, before=None, normalize=False, series=None
+        self,
+        source=None,
+        solutiontype=None,
+        after=None,
+        before=None,
+        normalize=False,
+        series=None,
     ):
-        self._get=None
+        self._get = None
         if source is not None and series is None:
-            series=[]
+            series = []
             if "{code}" in source:
                 series.extend(
                     FileTimeseries.seriesList(
@@ -1253,25 +1268,38 @@ class TimeseriesList(object):
                         normalize=normalize,
                     )
                 )
-                self._get=lambda code,**params: FileTimeseries(filename=source.replace('{code}',code),code=code,normalize=normalize,**params)  
+                self._get = lambda code, **params: FileTimeseries(
+                    filename=source.replace("{code}", code),
+                    code=code,
+                    normalize=normalize,
+                    **params,
+                )
             elif source.startswith("pg:"):
-                series.extend(PgTimeseries.seriesList(
+                series.extend(
+                    PgTimeseries.seriesList(
                         source[3:],
                         solutiontype,
                         after=after,
                         before=before,
-                        normalize=normalize,                    
-                ))
-                self._get=lambda code,**params: PgTimeseries(source=source,code=code,normalize=normalize,**params)
+                        normalize=normalize,
+                    )
+                )
+                self._get = lambda code, **params: PgTimeseries(
+                    source=source, code=code, normalize=normalize, **params
+                )
             elif source.startswith("api:"):
-                series.extend(CoordApiTimeseries.seriesList(
+                series.extend(
+                    CoordApiTimeseries.seriesList(
                         source[4:],
                         solutiontype,
                         after=after,
                         before=before,
-                        normalize=normalize,                    
-                ))
-                self._get=lambda code,**params: CoordApiTimeseries(source=source,code=code,normalize=normalize,**params)                
+                        normalize=normalize,
+                    )
+                )
+                self._get = lambda code, **params: CoordApiTimeseries(
+                    source=source, code=code, normalize=normalize, **params
+                )
             else:
                 series.extend(
                     SqliteTimeseries.seriesList(
@@ -1282,7 +1310,9 @@ class TimeseriesList(object):
                         normalize=normalize,
                     )
                 )
-                self._get=lambda code,**params: SqliteTimeseries(dbfile=source,code=code,normalize=normalize,**params)                
+                self._get = lambda code, **params: SqliteTimeseries(
+                    dbfile=source, code=code, normalize=normalize, **params
+                )
         self._series = series
 
     def codes(self):
@@ -1310,16 +1340,16 @@ class TimeseriesList(object):
         as yyyy-mm-dd.
         """
         if isinstance(solutiontype, str):
-            solutiontype = solutiontype.split('+')
-        series_types=[]
-        baseseries=None
+            solutiontype = solutiontype.split("+")
+        series_types = []
+        baseseries = None
         for series in self._series:
             if series.code() != code:
                 continue
-            baseseries=series
+            baseseries = series
             series_types.append(series.solutiontype())
         if len(solutiontype) > 0:
-            series_types=[s for s in series_types if s in solutiontype]
+            series_types = [s for s in series_types if s in solutiontype]
         elif len(series_types) > 1:
             raise RuntimeError(
                 "Ambiguous time series requested - multiple possible solution types"
@@ -1329,7 +1359,9 @@ class TimeseriesList(object):
                 "Invalid code/solution type requested - no matching time series found"
             )
         if self._get is not None:
-            return self._get(code,solutiontype=series_types,after=after,before=before)
+            return self._get(
+                code, solutiontype=series_types, after=after, before=before
+            )
         return baseseries
 
     def compareWith(self, other, after=None, before=None, normalize=False):
@@ -1387,10 +1419,10 @@ class TimeseriesList(object):
         def stats(self):
             """
             Get summary statistics for common stations between the two time series.
-            Returns a DataFrame indexed on code, with columns rse_sol1_[enu], 
-            rse_sol2_[enu] where sol1 and sol2 are the solution type,s and then 
+            Returns a DataFrame indexed on code, with columns rse_sol1_[enu],
+            rse_sol2_[enu] where sol1 and sol2 are the solution type,s and then
             diff_e, std_diff_e, diff_n, std_diff_n, diff_u, std_diff_u, where diff
-            and 
+            and
 
             """
             data = []

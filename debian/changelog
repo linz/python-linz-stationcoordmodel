@@ -1,3 +1,9 @@
+python-linz-stationcoordmodel (1.41.0-1) xenial; urgency=medium
+
+  * feat: Simplified Postgres SQL and SQL variables named to support replacing
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Tue, 31 May 2022 10:00:00 +1200
+
 python-linz-stationcoordmodel (1.40.0-1) xenial; urgency=medium
 
   * fix: Reloading models with xyz0 value set
