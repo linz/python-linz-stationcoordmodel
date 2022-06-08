@@ -71,7 +71,7 @@ setup(
     # have to be included in MANIFEST.in as well.
     package_data={
         "LINZ": [
-            "CORS_Analyst.cfg",
+            "CORS_Analyst.yaml",
             "report_datum_status.cfg",
         ]
     },

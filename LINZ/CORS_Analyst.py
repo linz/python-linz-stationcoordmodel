@@ -8,9 +8,9 @@ import tempfile
 import zipfile
 import numpy as np
 import pandas as pd
+import yaml
 from datetime import datetime
 from collections import namedtuple
-from configparser import SafeConfigParser
 from pandas.tseries.offsets import DateOffset
 
 from LINZ.Geodetic import GDB
@@ -25,26 +25,24 @@ StationData = namedtuple(
 StationOffsetStats = namedtuple("StationOffsetStats", "date gdbOffset scmOffset")
 RefCoordinateDate = datetime(2018, 1, 1)
 
+
 class CORS_Analyst(object):
 
-    refconfigfile = os.path.splitext(__file__)[0] + ".cfg"
+    refconfigfile = os.path.splitext(__file__)[0] + ".yaml"
     configfile = os.path.basename(refconfigfile)
-    configgroup = "analysis_settings"
-    httpre=re.compile(r'^https?\:\/\/')
+    httpre = re.compile(r"^https?\:\/\/")
 
     def __init__(
         self,
         verbose=False,
         write_plot_files=False,
         configfile=None,
-        configgroup=None,
         params=None,
     ):
         self._verbose = verbose
         self._writecsv = write_plot_files
         self._configfile = configfile or CORS_Analyst.configfile
-        self._configgroup = configgroup or CORS_Analyst.configgroup
-        self._tempdirs=[]
+        self._tempdirs = []
 
         if not os.path.exists(self._configfile):
             sys.stderr.write(
@@ -55,30 +53,47 @@ class CORS_Analyst(object):
         if self._verbose:
             print("Reading configuration from", self._configfile)
 
-        cfg = SafeConfigParser({"test_stations": "", "test_stations_file": ""})
-        cfg.readfp(open(self._configfile))
-        for k, v in params.items():
-            cfg.set("DEFAULT", k, v)
+        cfg = {"test_stations": "", "test_stations_file": ""}
+        filecfg = yaml.load(open(self._configfile), Loader=yaml.SafeLoader)
+        cfg.update(filecfg)
+        if params:
+            cfg.update(params)
         self._cfg = cfg
-        self._tsdb = cfg.get(self._configgroup, "timeseries_database")
-        self._tssolutiontype = cfg.get(self._configgroup, "timeseries_solution_type")
-        self._tslist = CORS_Timeseries.TimeseriesList(source=self._tsdb,solutiontype=self._tssolutiontype)
-        self._scmpath = cfg.get(self._configgroup, "station_coordinate_model_path")
+        self._tsdb = self.getCfg("timeseries_database")
+        self._tssolutiontype = self.getCfg("timeseries_solution_type")
+        self._tslist = CORS_Timeseries.TimeseriesList(
+            source=self._tsdb, solutiontype=self._tssolutiontype
+        )
+        self._scmpath = self.getCfg("station_coordinate_model_path")
         if self.httpre.match(self._scmpath):
-            zipspec,scmfile=self._scmpath.rsplit('/',maxsplit=1)
-            self._scmpath=self.downloadZipFile(zipspec)+"/"+scmfile
-        self._offsetdays = cfg.getint(self._configgroup, "offset_calc_ndays")
-        self._teststat = cfg.get(self._configgroup, "offset_test_stat")
+            zipspec, scmfile = self._scmpath.rsplit("/", maxsplit=1)
+            self._scmpath = self.downloadZipFile(zipspec) + "/" + scmfile
+        self._offsetdays = self.getCfg("offset_calc_ndays", parser=int)
+        self._teststat = self.getCfg("offset_test_stat")
         self._gdbwarning = self.loadWarningLevels("gdb_offset_warning")
         self._scmwarning = self.loadWarningLevels("scm_offset_warning")
 
         self.loadDeformationModel()
 
+    def getCfg(self, cfgitem, default=None, parser=None):
+        if cfgitem in self._cfg:
+            value = self._cfg[cfgitem]
+            if parser:
+                try:
+                    value = parser(value)
+                except:
+                    raise RuntimeError(
+                        f"Invalid value {value} for configuration item {cfgitem}"
+                    )
+            return value
+        elif default is not None:
+            return default
+        else:
+            raise RuntimeError(f"Missing configuration item {cfgitem}")
+
     def loadWarningLevels(self, warning_type):
         try:
-            levels = [
-                float(x) for x in self._cfg.get(self._configgroup, warning_type).split()
-            ]
+            levels = [float(x) for x in str(self.getCfg(warning_type)).split()]
             if len(levels) < 2:
                 levels.append[levels[0]]
         except:
@@ -87,35 +102,36 @@ class CORS_Analyst(object):
             )
         return levels
 
-    def downloadZipFile( self, zipfileurl ):
-     
+    def downloadZipFile(self, zipfileurl):
+
         try:
-            datapath=None
-            if '+' in zipfileurl:
-                zipfileurl,datapath=zipfileurl.split('+',maxsplit=1)
-            tempdir=tempfile.TemporaryDirectory()
-            data=urllib.request.urlopen(zipfileurl)
-            dirname=tempdir.name
-            zipfilename=os.path.join(dirname,'download.zip')
-            with open(zipfilename,'wb') as zfh:
-                shutil.copyfileobj(data,zfh)
-            with zipfile.ZipFile(zipfilename, 'r') as zf:
+            datapath = None
+            if "+" in zipfileurl:
+                zipfileurl, datapath = zipfileurl.split("+", maxsplit=1)
+            tempdir = tempfile.TemporaryDirectory()
+            data = urllib.request.urlopen(zipfileurl)
+            dirname = tempdir.name
+            zipfilename = os.path.join(dirname, "download.zip")
+            with open(zipfilename, "wb") as zfh:
+                shutil.copyfileobj(data, zfh)
+            with zipfile.ZipFile(zipfilename, "r") as zf:
                 zf.extractall(dirname)
             if datapath is not None:
-                dirname=os.path.join(dirname,datapath)
+                dirname = os.path.join(dirname, datapath)
             if os.path.isdir(dirname):
                 # Ensure temp directory remains for duration of script
                 self._tempdirs.append(tempdir)
                 return dirname
-            raise RuntimeError('Directory {0} not found in zipfile {1}'.format(datapath,zipfileurl))
-        except Exception as e :
-            raise RuntimeError("Failed to download {0}: {1}".format(zipfileurl,e))
-
+            raise RuntimeError(
+                "Directory {0} not found in zipfile {1}".format(datapath, zipfileurl)
+            )
+        except Exception as e:
+            raise RuntimeError("Failed to download {0}: {1}".format(zipfileurl, e))
 
     def loadDeformationModel(self):
-        path = self._cfg.get(self._configgroup, "deformation_model_path")
+        path = self.getCfg("deformation_model_path")
         if self.httpre.match(path):
-            path=self.downloadZipFile(path)
+            path = self.downloadZipFile(path)
         self.gdbCalculator = GDB_Timeseries.GDB_Timeseries_Calculator(path)
         self.deformationModelVersion = self.gdbCalculator.deformationModelVersion()
 
@@ -182,8 +198,8 @@ class CORS_Analyst(object):
         return StationOffsetStats(calcdate, (obsts - gdbts).describe(), scmdiff)
 
     def writeTimeseriesCSV(self, code, tsdata, csv_cfg_type):
-        results_dir = self._cfg.get(self._configgroup, "result_path")
-        results_file = self._cfg.get(self._configgroup, csv_cfg_type)
+        results_dir = self.getCfg("result_path")
+        results_file = self.getCfg(csv_cfg_type)
         csv_file = os.path.join(results_dir, results_file.replace("{code}", code))
         self.createFileDirectory(csv_file)
         tsdata.to_csv(csv_file, float_format="%.4f", index_label="epoch")
@@ -201,16 +217,16 @@ class CORS_Analyst(object):
         return rounder
 
     def writeResultsJSON(self, results):
-        results_dir = self._cfg.get(self._configgroup, "result_path")
-        results_file = self._cfg.get(self._configgroup, "summary_file")
+        results_dir = self.getCfg("result_path")
+        results_file = self.getCfg("summary_file")
         json_file = os.path.join(results_dir, results_file)
         rounder = self.roundFloatsInStruct(4)
         self.createFileDirectory(json_file)
         with open(json_file, "w") as jf:
             jf.write(json.dumps(rounder(results), indent=2, sort_keys=True))
-        
-    def createFileDirectory(self,filename):
-        dirname=os.path.dirname(filename)
+
+    def createFileDirectory(self, filename):
+        dirname = os.path.dirname(filename)
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
@@ -319,18 +335,10 @@ class CORS_Analyst(object):
         if self._writecsv:
             # Write the CSV file options
 
-            fillmodel = (
-                self._cfg.get(self._configgroup, "fill_model_timeseries").lower()
-                == "yes"
-            )
-            trimmodel = (
-                self._cfg.get(self._configgroup, "trim_model_timeseries").lower()
-                == "yes"
-            )
-            combinets = (
-                self._cfg.get(self._configgroup, "combine_timeseries").lower() == "yes"
-            )
-            precision = self._cfg.getfloat(self._configgroup, "trim_model_precision")
+            fillmodel = self.getCfg("fill_model_timeseries").lower() == "yes"
+            trimmodel = self.getCfg("trim_model_timeseries").lower() == "yes"
+            combinets = self.getCfg("combine_timeseries").lower() == "yes"
+            precision = self.getCfg("trim_model_precision", parser=float)
 
             # Generate data for plotting gdb coord and stn pred model
             # Get the observed timeseries
@@ -341,7 +349,7 @@ class CORS_Analyst(object):
             if fillmodel:
                 # If filling the model, normalize to whole dates
                 tsdata.set_index(tsdata.index.normalize(), inplace=True)
-                plotmargin = self._cfg.getint(self._configgroup, "plot_margin")
+                plotmargin = self.getCfg("plot_margin", parser=int)
                 startdate = tsdata.index[0] - DateOffset(days=plotmargin)
                 enddate = tsdata.index[-1] + DateOffset(days=plotmargin)
                 dates = pd.date_range(startdate, enddate, freq="d")
@@ -379,13 +387,11 @@ class CORS_Analyst(object):
         if codelist is None:
             codelist = []
         if len(codelist) == 0:
-            codeliststr = self._cfg.get(self._configgroup, "test_stations").strip()
+            codeliststr = self.getCfg("test_stations").strip()
             if codeliststr != "":
                 codelist.extend(codeliststr.split())
 
-            codelistfile = self._cfg.get(
-                self._configgroup, "test_stations_file"
-            ).strip()
+            codelistfile = self.getCfg("test_stations_file").strip()
             if codelistfile != "":
                 with open(codelistfile) as codef:
                     for l in codef:

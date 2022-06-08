@@ -1,0 +1,76 @@
+test_stations: AUCK BLUF CHTI CORM DNVK DUND GISB
+  GLDB HAAS HAMT HAST HIKB HOKI KAIK KTIA
+  LEXA LKTA MAHO MAST MAVL METH MQZG MTJO
+  NLSN NPLY OUSD PYGR TAUP TRNG VGMT WAIM WANG
+  WARK WEST WGTN WHKT WHNG
+
+# Alternatively stations can be defined by specifying a
+# test_stations_file.  station codes are entered on one
+# or more lines in file separated by whitespace.  Lines
+# starting with # are ignored.
+
+test_stations_file: filename
+
+# Time series database can be an sqlite database filename (table=mark_coordinates),
+# a postgres database (table=coords), or a
+
+timeseries_database: tsdata/coordinates_bsl.db
+
+timeseries_solution_type: bsl+bsl-rapid
+
+deformation_model_path: https://www.geodesy.linz.govt.nz/download/nzgd2000_deformation_model+model
+
+# If not using station coordinate models, set station_coordinate_model_path to "none"
+
+station_coordinate_model_path: https://github.com/linz/positionz_coordinate_models/archive/master.zip+positionz_coordinate_models-master/stations/{code}.xml
+
+# Number of days to calculate offset over
+
+offset_calc_ndays: 30
+
+# The offset test statistic should be based on either
+# the median or the mean
+
+offset_test_stat: mean
+
+# Warning level, horizontal and vertical
+
+gdb_offset_warning: 0.01 0.03
+
+scm_offset_warning: 0.005 0.015
+
+# Location of results files
+
+result_path: results
+
+summary_file: cors_summary.json
+
+timeseries_csv: "{code}_enu_ts.csv"
+
+gdb_timeseries_csv: "{code}_gdb_enu_ts.csv"
+
+scm_timeseries_csv: "{code}_scm_enu_ts.csv"
+
+# If fill_model_timeseries is yes, then gaps in the time
+# series are filled in the CSV data for the model series
+# (ie station coord model and gdb coordinate)
+# If filling then plot_margin is the days before and
+# after end of time series to extend the model plots.
+
+fill_model_timeseries: yes
+
+plot_margin: 20
+
+# Option to trim model timeseries (GDB and station coordinate
+# model time series.  If "yes" then time series will be filled
+# across missing data, and then thinned to plot a line
+# covering the required range. Otherwise the model time
+# series will match the dates of the observed time series
+
+trim_model_timeseries: no
+
+trim_model_precision: 0.001
+
+# If yes then the three time series are combined into a single CSV file
+
+combine_timeseries: yes
