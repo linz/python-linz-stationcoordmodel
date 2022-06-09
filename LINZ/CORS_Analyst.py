@@ -60,7 +60,11 @@ class CORS_Analyst(object):
             cfg.update(params)
         self._cfg = cfg
         self._tsdb = self.getCfg("timeseries_database")
-        self._tssolutiontype = self.getCfg("timeseries_solution_type")
+        # Allow timeseries strategy as alternative name - precursor to converting to general use
+        # of strategy rather than solution_type
+        self._tssolutiontype = self.getCfg("timeseries_strategy", "") or self.getCfg(
+            "timeseries_solution_type"
+        )
         self._tslist = CORS_Timeseries.TimeseriesList(
             source=self._tsdb, solutiontype=self._tssolutiontype
         )
@@ -74,6 +78,16 @@ class CORS_Analyst(object):
         self._scmwarning = self.loadWarningLevels("scm_offset_warning")
 
         self.loadDeformationModel()
+
+    def boolParser(self, value):
+        if value == None:
+            return False
+        elif type(value) == bool:
+            return value
+        elif str(value).lower() == "yes":
+            return True
+        else:
+            return False
 
     def getCfg(self, cfgitem, default=None, parser=None):
         if cfgitem in self._cfg:
@@ -335,15 +349,15 @@ class CORS_Analyst(object):
         if self._writecsv:
             # Write the CSV file options
 
-            fillmodel = self.getCfg("fill_model_timeseries").lower() == "yes"
-            trimmodel = self.getCfg("trim_model_timeseries").lower() == "yes"
-            combinets = self.getCfg("combine_timeseries").lower() == "yes"
+            fillmodel = self.getCfg("fill_model_timeseries", parser=self.boolParser)
+            trimmodel = self.getCfg("trim_model_timeseries", parser=self.boolParser)
+            combinets = self.getCfg("combine_timeseries", parser=self.boolParser)
             precision = self.getCfg("trim_model_precision", parser=float)
 
             # Generate data for plotting gdb coord and stn pred model
             # Get the observed timeseries
             ts = stndata.timeseries
-            tsdata = ts.getData()
+            tsdata = ts.getData(solution_types=True)
 
             # Fill the model
             if fillmodel:

@@ -1,8 +1,14 @@
+python-linz-stationcoordmodel (1.51.0-1) xenial; urgency=medium
+
+  * feat: CORS_Analyst CSV files include solution type
+
+ -- Chris Crook <ccrook@linz.govt.nz>  Thu, 9 Jun 2022 14:00:00 +1200
+
 python-linz-stationcoordmodel (1.50.0-1) xenial; urgency=medium
 
-  * feat: Breaking change - CORS_Analyst configuration converted to python
+  * feat: Breaking change - CORS_Analyst configuration converted to yaml
 
- -- Chris Crook <ccrook@linz.govt.nz>  Wed, 8 JUn 2022 20:00:00 +1200
+ -- Chris Crook <ccrook@linz.govt.nz>  Wed, 8 Jun 2022 20:00:00 +1200
 
 python-linz-stationcoordmodel (1.41.0-1) xenial; urgency=medium
 
