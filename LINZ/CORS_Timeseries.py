@@ -82,7 +82,6 @@ class Timeseries(object):
         xyz=None,
         xyz0=None,
         xyzenu=None,
-        epochtype=None,
         transform=None,
         after=None,
         before=None,
@@ -94,12 +93,11 @@ class Timeseries(object):
         code            the station code being loaded
         solutiontype    a string identifying the solution type of the time series
         data            a pandas data frame with columns indexed on date and with
-                        columns x, y, z, and possibly solutiontype
+                        columns x, y, z
         dates, xyz      Alternative format for loading, dates is an array of dates,
                         xyz is a numpy array with shape (n,3)
         xyz0            Reference xyz coordinate for calculated enu components
         xyzenu          Reference xyz coordinate for calculated enu components
-        epochtype       An array of solution types for each epoch
         transform       A transformation function applied to the XYZ coordinates
         after           The earliest date of interest
         before          The latest date of interest
@@ -119,8 +117,6 @@ class Timeseries(object):
         self.setDateRange(after=after, before=before)
         if xyz is not None and dates is not None:
             data = pd.DataFrame(xyz, columns=("x", "y", "z"))
-            if epochtype is not None:
-                data["solution_type"] = epochtype
             data.set_index(pd.to_datetime(dates), inplace=True)
         self._sourcedata = data
 
@@ -258,9 +254,7 @@ class Timeseries(object):
         data = self.getData(enu=enu, detrend=detrend, normalize=normalize, index=index)
         return data.index.to_pydatetime(), np.vstack([data[x] for x in cols]).T
 
-    def getData(
-        self, enu=True, detrend=False, index=None, normalize=False, solution_types=False
-    ):
+    def getData(self, enu=True, detrend=False, index=None, normalize=False):
         """
         Returns the time series as a pandas DataFrame.
 
@@ -269,12 +263,9 @@ class Timeseries(object):
             detrend     Remove trend from observations
             index       Pandas data frame index to extract subset of data
             normalize   Normalize dates in time series
-            solution_type  If true then include the solution type in the results
         """
         self._load()
         columns = ["e", "n", "u"] if enu else ["x", "y", "z"]
-        if solution_types and "solution_type" in self._data.columns:
-            columns.append("solution_type")
         result = self._data[columns]
         if detrend:
             trend = self.trend(columns)
@@ -504,7 +495,6 @@ class Timeseries(object):
             data=d1,
             xyz0=self._xyz0,
             xyzenu=self._xyzenu,
-            epochtype=self.data.get("solution_type") if self.data is not None else None,
         )
 
     def robustStandardError(self, percentile=95.0):
@@ -576,9 +566,6 @@ class Timeseries(object):
             solutiontype=self._solutiontype,
             xyz0=self._xyz0,
             xyzenu=self._xyzenu,
-            epochtype=self._data.get("solution_type")
-            if self._data is not None
-            else None,
             transform=None,
         )
         result._isfunction = self._isfunction
@@ -636,7 +623,7 @@ class Timeseries(object):
 class SqliteTimeseries(Timeseries):
 
     _sql = """
-        select epoch, code, solution_type, X as x, Y as y, Z as z 
+        select epoch, code as code, X as x, Y as y, Z as z 
         from mark_coordinate m
         where code=? and solution_type=?
         {when}
@@ -645,7 +632,7 @@ class SqliteTimeseries(Timeseries):
 
     _sqlMultiType = """
         select
-             m.epoch, m.code, m.solution_type, m.X as x, m.Y as y, m.Z as z 
+             m.epoch, m.code as code, m.solution_type, m.X as x, m.Y as y, m.Z as z 
         from
              mark_coordinate m,
              (select
@@ -789,7 +776,6 @@ class PgTimeseries(Timeseries):
         )
         select DISTINCT ON (date(epoch))
            to_char(epoch,'YYYY-MM-DD') as epoch, 
-           c.solution_type,
            X as x, Y as y, Z as z 
         from coords c, p
         where 
@@ -1062,7 +1048,12 @@ class FileTimeseries(Timeseries):
 
     @staticmethod
     def seriesList(
-        filepattern, solutiontype="default", after=None, before=None, normalize=False
+        filepattern,
+        solutiontype="default",
+        after=None,
+        before=None,
+        normalize=False,
+        delim_whitespace=False,
     ):
         """
         Get the potential time series files, any file matching the filepattern.  The
@@ -1097,6 +1088,7 @@ class FileTimeseries(Timeseries):
                     after=after,
                     before=before,
                     normalize=normalize,
+                    delim_whitespace=delim_whitespace,
                 )
             )
         return series
@@ -1111,6 +1103,7 @@ class FileTimeseries(Timeseries):
         after=None,
         before=None,
         normalize=False,
+        delim_whitespace=False,
     ):
         Timeseries.__init__(
             self,
@@ -1123,6 +1116,7 @@ class FileTimeseries(Timeseries):
             normalize=normalize,
         )
         self._filename = filename
+        self._delim_whitespace = delim_whitespace
 
     def _loadData(self):
 
@@ -1134,26 +1128,10 @@ class FileTimeseries(Timeseries):
                 "CORS time series file {0} does not exist".format(filename)
             )
 
-        columns = []
-        try:
-            with open(filename) as f:
-                columns = f.readline().split()
-        except:
-            raise RuntimeError(
-                "CORS time series file {0} missing or empty".format(filename)
-            )
-
-        missing_cols = [x for x in self._columns if x not in columns]
-        if missing_cols:
-            raise RuntimeError(
-                "Columns {0} missing from CORS time series file {1}".format(
-                    " ".join(missing_cols), filename
-                )
-            )
         try:
             data = pd.read_csv(
                 filename,
-                delim_whitespace=True,
+                delim_whitespace=self._delim_whitespace,
                 parse_dates=True,
                 index_col=self._epoch_col,
             )
@@ -1161,6 +1139,17 @@ class FileTimeseries(Timeseries):
             raise RuntimeError(
                 "Cannot read time series data from {0}: {1}".format(
                     filename, sys.exc_info()[1]
+                )
+            )
+
+        columns = data.columns
+        missing_cols = [
+            x for x in self._columns if x not in columns and x != self._epoch_col
+        ]
+        if missing_cols:
+            raise RuntimeError(
+                "Columns {0} missing from CORS time series file {1}".format(
+                    " ".join(missing_cols), filename
                 )
             )
 
