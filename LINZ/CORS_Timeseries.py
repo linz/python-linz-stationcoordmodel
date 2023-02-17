@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import sys
 import os
 import os.path
 import re
 import sqlite3
 import json
+import logging
 
 import numpy as np
 import datetime as dt
@@ -12,8 +15,10 @@ from scipy import stats
 
 from LINZ.Geodetic.Ellipsoid import GRS80
 
+from typing import Any, Callable, NewType
 
-def robustStandardError(obs, percentile=95.0):
+
+def robustStandardError(obs: np.ndarray, percentile: float = 95.0) -> np.ndarray:
     """
     Estimate the standard error for components of a time series.
 
@@ -34,7 +39,13 @@ def robustStandardError(obs, percentile=95.0):
     return np.array(errors)
 
 
-def findOutliers(enu_data, ndays=10, tolerance=5.0, percentile=95.0, goodrows=False):
+def findOutliers(
+    enu_data: pd.DataFrame,
+    ndays: int = 10,
+    tolerance: int | float = 5.0,
+    percentile: int | float = 95.0,
+    goodrows: bool = False,
+) -> pd.Index:
     """
     Detect outliers in the time series and return either the indexes of outliers
     (goodrows=False) or of the non-outliers (goodrows=True).  Assumes that enu_data
@@ -66,26 +77,41 @@ def findOutliers(enu_data, ndays=10, tolerance=5.0, percentile=95.0, goodrows=Fa
     return idx[rows]
 
 
-def normalizeSolutionType(solutiontype):
+def normalizeSolutionType(solutiontype: str | list[str]) -> str:
     if isinstance(solutiontype, list):
         solutiontype = "+".join(solutiontype)
     return solutiontype
 
 
+TransformFunc = Callable[[np.ndarray], np.ndarray]
+
+
 class Timeseries(object):
+    _loaded: bool
+    _isfunction: bool
+    _code: str
+    _solutiontype: str
+    _xyz0: np.ndarray | None
+    _xyzenu: np.ndarray | None
+    _transform: TransformFunc | None
+    _before: dt.datetime | None
+    _after: dt.datetime | None
+    _normalize: bool
+    _sourcedata: pd.DataFrame | None
+
     def __init__(
         self,
-        code,
-        solutiontype="default",
-        data=None,
-        dates=None,
-        xyz=None,
-        xyz0=None,
-        xyzenu=None,
-        transform=None,
-        after=None,
-        before=None,
-        normalize=False,
+        code: str,
+        solutiontype: str = "default",
+        data: pd.DataFrame | None = None,
+        dates: np.ndarray = None,
+        xyz: np.ndarray = None,
+        xyz0: np.ndarray = None,
+        xyzenu: np.ndarray = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
     ):
         """
         Create a time series. Parameters are:
@@ -120,13 +146,14 @@ class Timeseries(object):
             data.set_index(pd.to_datetime(dates), inplace=True)
         self._sourcedata = data
 
-    def _loadData(self):
+    def _loadData(self) -> pd.DataFrame:
         """
         Abstract class, overridden in base classes
         """
+        assert self._sourcedata is not None
         return self._sourcedata.copy()
 
-    def _load(self):
+    def _load(self) -> None:
 
         if self._loaded:
             return
@@ -134,9 +161,19 @@ class Timeseries(object):
         # Call provider specific data load
         # Should return a dataframe with x,y,z indexed on the date/time of the each point
 
+        self._loaded = True
         data = self._loadData()
-        if data is None:
-            raise RuntimeError("No data provided for time series")
+        if data is None or data.shape[0] == 0:
+            message = [
+                f"No {self._solutiontype} timeseries data found for {self._code}"
+            ]
+            if self._after is not None:
+                message.append(f"after {self._after:%Y-%m-%d}")
+            if self._before is not None:
+                if self._after:
+                    message.append("and")
+                message.append(f"before {self._before:%Y-%m-%d}")
+            raise RuntimeError(" ".join(message))
 
         if self._after is not None:
             data = data[data.index > self._after]
@@ -150,7 +187,7 @@ class Timeseries(object):
         data.sort_index(inplace=True)
         xyz = np.vstack((data.x, data.y, data.z)).T
         if self._transform:
-            xyz = [self._transform(x) for x in xyz]
+            xyz = np.array([self._transform(x) for x in xyz])
             data["x"] = xyz[:, 0]
             data["y"] = xyz[:, 1]
             data["z"] = xyz[:, 2]
@@ -171,7 +208,12 @@ class Timeseries(object):
         self._xyz0 = xyz0
         self._data = data
 
-    def setXyzTransform(self, xyz0=None, xyzenu=None, transform=None):
+    def setXyzTransform(
+        self,
+        xyz0: np.ndarray | None = None,
+        xyzenu: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+    ) -> None:
         xyz0 = None if xyz0 is None else np.array(xyz0)
         xyzenu = None if xyzenu is None else np.array(xyzenu)
         if xyz0 is not None and (self._xyz0 is None or (self._xyz0 != xyz0).any()):
@@ -186,7 +228,12 @@ class Timeseries(object):
             self._transform = transform
             self._loaded = False
 
-    def setDateRange(self, after=None, before=None, reset=False):
+    def setDateRange(
+        self,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        reset: bool = False,
+    ) -> None:
         if reset:
             self._after = None
             self._before = None
@@ -201,26 +248,28 @@ class Timeseries(object):
             self._before = before
             self._loaded = False
 
-    def xyz0(self):
+    def xyz0(self) -> np.ndarray:
         if self._xyz0 is None:
             self._load()
+        assert self._xyz0 is not None
         return self._xyz0
 
-    def xyzenu(self):
+    def xyzenu(self) -> np.ndarray:
         if self._xyzenu is None:
             self._load()
+        assert self._xyzenu is not None
         return self._xyzenu
 
-    def code(self):
+    def code(self) -> str:
         return self._code
 
-    def solutiontype(self):
+    def solutiontype(self) -> str:
         return self._solutiontype
 
-    def setName(self, code):
+    def setName(self, code: str) -> None:
         self._code = code
 
-    def trend(self, columns="e n u".split()):
+    def trend(self, columns: list[str] | str = "e n u".split()) -> pd.DataFrame:
         import matplotlib.dates as mdates
 
         self._load()
@@ -234,7 +283,13 @@ class Timeseries(object):
             np.vstack(trends).T, index=self._data.index, columns=columns
         )
 
-    def getObs(self, enu=True, detrend=False, normalize=False, index=None):
+    def getObs(
+        self,
+        enu: bool = True,
+        detrend: bool = False,
+        normalize: bool = False,
+        index: pd.Index = None,
+    ) -> tuple[list[dt.datetime], np.ndarray]:
         """
         Returns the time series as date and enu/xyz arrays
 
@@ -245,7 +300,7 @@ class Timeseries(object):
             normalize   Normalize dates in time series
 
         Returns two values:
-            dates    Andarray of dates for the time series
+            dates    An array of dates for the time series
             enu      An numpy array of east,north,up values relative to the
                      model reference coordinate, or xyz coordinates if enu is False
         """
@@ -254,7 +309,13 @@ class Timeseries(object):
         data = self.getData(enu=enu, detrend=detrend, normalize=normalize, index=index)
         return data.index.to_pydatetime(), np.vstack([data[x] for x in cols]).T
 
-    def getData(self, enu=True, detrend=False, index=None, normalize=False):
+    def getData(
+        self,
+        enu: bool = True,
+        detrend: bool = False,
+        index: bool = None,
+        normalize: bool = False,
+    ) -> pd.DataFrame:
         """
         Returns the time series as a pandas DataFrame.
 
@@ -263,6 +324,9 @@ class Timeseries(object):
             detrend     Remove trend from observations
             index       Pandas data frame index to extract subset of data
             normalize   Normalize dates in time series
+
+        Returns:
+            data        A pandas dataframe with columns e,n,u or x,y,z and a date index.
         """
         self._load()
         columns = ["e", "n", "u"] if enu else ["x", "y", "z"]
@@ -276,25 +340,27 @@ class Timeseries(object):
             result.set_index(result.index.normalize(), inplace=True)
         return result
 
-    def dates(self):
+    def dates(self) -> pd.Index:
         """
         Returns the dates of the time series
         """
         self._load()
         return self._data.index
 
+    PlotDefDict = dict[str, Any]
+
     def plot(
         self,
-        detrend=False,
-        enu=True,
-        independent=False,
-        samescale=False,
-        mmunits=False,
-        symbol=None,
-        baseplot=None,
-        figtitle=True,
-        **kwds,
-    ):
+        detrend: bool = False,
+        enu: bool = True,
+        independent: bool = False,
+        samescale: bool = False,
+        mmunits: bool = False,
+        symbol: str | None = None,
+        baseplot: PlotDefDict = None,
+        figtitle: bool = True,
+        **kwds: dict[str, Any],
+    ) -> PlotDefDict:
         """
         Plot the time series onto 3 separate graphs
 
@@ -422,7 +488,13 @@ class Timeseries(object):
                 plots[i].format_xdata = mdates.DateFormatter("%d-%m-%Y")
         return baseplot
 
-    def subtract(self, other, newcode=None, newtype=None, normalize=False):
+    def subtract(
+        self,
+        other: Timeseries,
+        newcode: str | None = None,
+        newtype: str | None = None,
+        normalize: bool = False,
+    ) -> Timeseries:
         """
         Returns a time series subtracting other from the current series.  Other
         can be another time series, or a function that takes a date as input
@@ -471,7 +543,9 @@ class Timeseries(object):
         xyzenu = self._xyzenu if self._xyzenu is not None else self._xyz0
         return Timeseries(newcode, newtype, data=data, xyz0=xyz0, xyzenu=xyzenu)
 
-    def resample(self, rule, normalize=True, how=None):
+    def resample(
+        self, rule: str | int, normalize: bool = True, how: str | None = None
+    ) -> Timeseries:
         """
         Resamples the time series using pd.DataFrame.resample.
 
@@ -497,14 +571,20 @@ class Timeseries(object):
             xyzenu=self._xyzenu,
         )
 
-    def robustStandardError(self, percentile=95.0):
+    def robustStandardError(self, percentile: float | int = 95.0) -> np.ndarray:
         """
         Returns the "robust standard error" of the time series E,N,U components
         as a numpy array.
         """
         return robustStandardError(self.getObs()[1], percentile)
 
-    def findOutliers(self, ndays=10, tolerance=5.0, percentile=95.0, goodrows=False):
+    def findOutliers(
+        self,
+        ndays: int = 10,
+        tolerance: float | int = 5.0,
+        percentile: float | int = 95.0,
+        goodrows: bool = False,
+    ) -> pd.Index:
         """
         Return index of outliers or good rows.
         """
@@ -516,7 +596,12 @@ class Timeseries(object):
             goodrows=goodrows,
         )
 
-    def withoutOutliers(self, ndays=10, tolerance=5.0, percentile=95.0):
+    def withoutOutliers(
+        self,
+        ndays: int = 10,
+        tolerance: float | int = 5.0,
+        percentile: float | int = 95.0,
+    ) -> Timeseries:
         """
         Return a new version of the time series without the outliers
         """
@@ -525,7 +610,12 @@ class Timeseries(object):
         )
         return self.filtered(index=index)
 
-    def filtered(self, index=None, before=None, after=None):
+    def filtered(
+        self,
+        index: pd.Index | None = None,
+        before: dt.datetime | None = None,
+        after: dt.datetime | None = None,
+    ) -> Timeseries:
         """
         Return a subset of the data filtered to a set of index values
         """
@@ -540,7 +630,9 @@ class Timeseries(object):
         data = data.loc[filter]
         return self.usingData(data)
 
-    def offsetBy(self, offset):
+    def offsetBy(
+        self, offset: pd.DataFrame | np.ndarray | list[float] | float
+    ) -> Timeseries:
         """
         Returns a new Timeseries created by adding an offset to the
         time series.
@@ -554,7 +646,7 @@ class Timeseries(object):
         diff = diff[np.isfinite(diff.x)]
         return self.usingData(diff)
 
-    def usingData(self, data):
+    def usingData(self, data: np.ndarray) -> Timeseries:
         """
         Returns a copy of the current time series but using data
         specified.  Keeps code, solutiontype, xyz0, xyzenu.
@@ -572,7 +664,18 @@ class Timeseries(object):
         return result
 
     class Comparison(object):
-        def __init__(self, ts1, ts2, newcode=None, newtype=None, normalize=False):
+        ts1: Timeseries
+        ts2: Timeseries
+        diff: Timeseries
+
+        def __init__(
+            self,
+            ts1: Timeseries,
+            ts2: Timeseries,
+            newcode: str | None = None,
+            newtype: str | None = None,
+            normalize: bool = False,
+        ):
             """
             Represents a comparison of two time series, with elements ts1, ts2, diff
             Diff is in the sense ts1-ts2
@@ -583,26 +686,26 @@ class Timeseries(object):
                 ts2, newcode=newcode, newtype=newtype, normalize=normalize
             )
 
-        def plot(self, detrend=True):
+        def plot(self, detrend: bool = True) -> None:
             """
             Plot the two time series overlaid
             """
             p1 = self.ts1.plot(detrend=detrend)
             p1 = self.ts2.plot(baseplot=p1)
 
-        def plotDiff(self):
+        def plotDiff(self) -> None:
             """
             Plot the difference
             """
             self.diff.plot()
 
-        def stats(self):
+        def stats(self) -> pd.DataFrame:
             """
             Return the stats of the difference
             """
             return self.diff.getData().describe()
 
-        def printDetrendedStats(self):
+        def printDetrendedStats(self) -> None:
             """
             Print the stats for each time series.
             """
@@ -610,17 +713,18 @@ class Timeseries(object):
             ts2 = self.ts2
             rsets1 = ts1.robustStandardError()
             rsets2 = ts2.robustStandardError()
-            ts1 = ts1.getData() - ts1.trend()
-            ts2 = ts2.getData() - ts2.trend()
+            dts1 = ts1.getData() - ts1.trend()
+            dts2 = ts2.getData() - ts2.trend()
             print(self.ts1.solutiontype(), "solution detrended stats")
-            print(ts1.describe())
+            print(dts1.describe())
             print("Robust SE: ", rsets1)
             print(self.ts2.solutiontype(), "solution detrended stats")
-            print(ts2.describe())
+            print(dts2.describe())
             print("Robust SE: ", rsets2)
 
 
 class SqliteTimeseries(Timeseries):
+    _dbfile: str
 
     _sql = """
         select epoch, code as code, X as x, Y as y, Z as z 
@@ -660,14 +764,20 @@ class SqliteTimeseries(Timeseries):
         """
 
     @staticmethod
-    def _openDb(dbfile):
+    def _openDb(dbfile: str) -> sqlite3.Connection:
         if not os.path.exists(dbfile):
             raise RuntimeError(str(dbfile) + " does not exist")
         db = sqlite3.connect(dbfile, detect_types=sqlite3.PARSE_DECLTYPES)
         return db
 
     @staticmethod
-    def seriesList(dbfile, solutiontype=None, after=None, before=None, normalize=False):
+    def seriesList(
+        dbfile,
+        solutiontype: str | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+    ) -> list[SqliteTimeseries]:
         db = SqliteTimeseries._openDb(dbfile)
         seriescodes = pd.read_sql(SqliteTimeseries._sqlList, db)
         db.close()
@@ -695,14 +805,14 @@ class SqliteTimeseries(Timeseries):
 
     def __init__(
         self,
-        dbfile,
-        code,
-        solutiontype="default",
-        xyz0=None,
-        transform=None,
-        after=None,
-        before=None,
-        normalize=False,
+        dbfile: str,
+        code: str,
+        solutiontype: str = "default",
+        xyz0: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
     ):
         Timeseries.__init__(
             self,
@@ -716,10 +826,14 @@ class SqliteTimeseries(Timeseries):
         )
         self._dbfile = dbfile
 
-    def _loadData(self):
-        db = SqliteTimeseries._openDb(self._dbfile)
+    def _loadData(self) -> None:
         solntype = self.solutiontype()
         code = self.code()
+        logging.debug(
+            f"CORS_Timeseries: Loading SQLite data from {self._dbfile} for {code}:{solntype}"
+        )
+        db = SqliteTimeseries._openDb(self._dbfile)
+        params: list = []
         if "+" not in solntype:
             sql = SqliteTimeseries._sql
             params = [code, solntype]
@@ -747,6 +861,8 @@ class SqliteTimeseries(Timeseries):
             when = when + " and m.epoch > ?"
             params.append(self._after.strftime("%Y-%m-%d"))
         sql = sql.replace("{when}", when)
+        logging.debug(f"SQL: {sql}")
+        logging.debug(f"Params: {params}")
         data = pd.read_sql(sql, db, params=params, index_col="epoch")
         db.close()
         # , parse_dates=['epoch'])
@@ -834,10 +950,11 @@ class PgTimeseries(Timeseries):
         """
 
     @staticmethod
-    def _openDb(source):
+    def _openDb(source: str | None) -> pd._SqlConnection:
         import psycopg2
 
         source = source or ""
+        srcprm: dict = {}
         if source.startswith("pg:"):
             source = source[3:]
         if source == "":
@@ -847,24 +964,28 @@ class PgTimeseries(Timeseries):
                     "Postgres database not defined by environment variables"
                 )
             source = "dbname=" + dbname
-        elif source.startswith("{"):
-            source = json.loads(source)
-        elif "=" not in source:
-            source = "dbname=" + source
         try:
-            if isinstance(source, str):
-                source = {"dsn": source}
-            db = psycopg2.connect(**source)
+            if source.startswith("{"):
+                srcprm = json.loads(source)
+            else:
+                if "=" not in source:
+                    source = "dbname=" + source
+                srcprm = {"dsn": source}
+            db = psycopg2.connect(**srcprm)
         except:
-            if "password" in source:
-                source["password"] = "..."
-            raise RuntimeError(f"Cannot connect to database {source}")
+            if "password" in srcprm:
+                srcprm["password"] = "..."
+            raise RuntimeError(f"Cannot connect to database {srcprm}")
         return db
 
     @staticmethod
     def seriesList(
-        source=None, solutiontype=None, after=None, before=None, normalize=False
-    ):
+        source: str | None = None,
+        solutiontype: str | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+    ) -> list[PgTimeseries]:
         db = PgTimeseries._openDb(source)
         seriescodes = pd.read_sql(PgTimeseries.GetCodeSolutionTypeSql, db)
         db.close()
@@ -892,14 +1013,14 @@ class PgTimeseries(Timeseries):
 
     def __init__(
         self,
-        source,
-        code,
-        solutiontype="default",
-        xyz0=None,
-        transform=None,
-        after=None,
-        before=None,
-        normalize=False,
+        source: str | None,
+        code: str,
+        solutiontype: str = "default",
+        xyz0: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
     ):
         Timeseries.__init__(
             self,
@@ -913,14 +1034,17 @@ class PgTimeseries(Timeseries):
         )
         self._source = source
 
-    def _loadData(self):
-        db = self._openDb(self._source)
+    def _loadData(self) -> None:
         solntype = self.solutiontype()
         code = self.code()
+        logging.debug(
+            f"CORS_Timeseries: Loading Postgres data from {self._source} for {code}:{solntype}"
+        )
+        db = self._openDb(self._source)
         if "+" not in solntype:
             sql = PgTimeseries.GetCoordinatesSql
         else:
-            sql = PgTimeseries.GetMultiSolutionCoordinates.SQL
+            sql = PgTimeseries.GetMultiSolutionCoordinatesSql
 
         minepoch = None
         maxepoch = None
@@ -947,52 +1071,72 @@ class CoordApiTimeseries(Timeseries):
       {baseurl}/coordinates?code=xxxx&strategy=xxx[+xxx]* [from_epoch=YYYY:DDD] [to_epoch=YYYY:DDD]
     """
 
+    DefaultApiUrl = "http://results.prod.gnss-processing.awsint.linz.govt.nz/api/v1"
+    ApiUrlEnvVar = "GNSS_COORD_API_URL"
+
     @staticmethod
-    def _getData(source, apiquery):
-        import urllib.request
+    def _getApiUrl(apiurl: str | None) -> str:
+        if apiurl is None or apiurl == "":
+            url = os.environ.get(
+                CoordApiTimeseries.ApiUrlEnvVar, CoordApiTimeseries.DefaultApiUrl
+            )
+            return url
+        return apiurl
+
+    @staticmethod
+    def _getData(source, apiquery: str) -> Any:
+        import requests
 
         if source.startswith("api:"):
             source = source[4:]
         url = source + "/" + apiquery
         try:
-            with urllib.request.urlopen(url) as response:
-                data = json.loads(response.read().decode("utf8"))
+            logging.debug(f"CoordApiTimeseries: Requesting {url}")
+            with requests.get(url) as response:
+                if response.status_code != 200:
+                    raise RuntimeError(f"Status code {response.status_code}")
+                data = response.json()
             return data
         except Exception as ex:
             raise RuntimeError(f"Failed to load {url}: {ex}")
 
     @staticmethod
     def seriesList(
-        source=None, solutiontype=None, after=None, before=None, normalize=False
-    ):
-        series = []
+        solutiontype: str | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+        apiurl: str | None = None,
+    ) -> list[CoordApiTimeseries]:
+        apiurl = CoordApiTimeseries._getApiUrl(apiurl)
+        series: list[CoordApiTimeseries] = []
         query = "solution_stats"
         if solutiontype:
             query = query + f"?strategy={solutiontype}"
-        for strategy in CoordApiTimeseries._getData(source, query)["strategies"]:
+        for strategy in CoordApiTimeseries._getData(apiurl, query)["strategies"]:
             for code in strategy["codes"]:
                 series.append(
                     CoordApiTimeseries(
-                        source,
                         code["code"],
                         strategy["strategy"],
                         after=after,
                         before=before,
                         normalize=normalize,
+                        apiurl=apiurl,
                     )
                 )
         return series
 
     def __init__(
         self,
-        source,
-        code,
-        solutiontype="default",
-        xyz0=None,
-        transform=None,
-        after=None,
-        before=None,
-        normalize=False,
+        code: str,
+        solutiontype: str = "default",
+        xyz0: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+        apiurl: str | None = None,
     ):
         Timeseries.__init__(
             self,
@@ -1004,21 +1148,24 @@ class CoordApiTimeseries(Timeseries):
             before=before,
             normalize=normalize,
         )
-        self._source = source
+        self._apiurl = self._getApiUrl(apiurl)
 
-    def _loadData(self):
+    def _loadData(self) -> None:
         solntype = self.solutiontype()
         code = self.code()
+        logging.debug(
+            f"CORS_Timeseries: Loading Coordinate API data from {self._apiurl} for {code}:{solntype}"
+        )
         query = f"coordinates?code={code}&strategy={solntype}"
         if self._after is not None:
             query = query + "&from_epoch=" + self._after.strftime("%Y:%j")
         if self._before is not None:
             query = query + "&to_epoch=" + self._before.strftime("%Y:%j")
-        result = self._getData(self._source, query)
+        result = self._getData(self._apiurl, query)
         tsdata = result["data"]
-        columns = ["solution_type" if c == "strategy" else c for c in result["columns"]]
+        columns = ["solution_type" if c == "strategy" else c for c in result["fields"]]
         data = pd.DataFrame(tsdata, columns=columns)
-        data.set_index(pd.to_datetime(data["epoch"], format="%Y:%j"), inplace=True)
+        data.set_index(pd.to_datetime(data["sessionid"], format="%Y:%j"), inplace=True)
         return data
 
 
@@ -1028,7 +1175,7 @@ class FileTimeseries(Timeseries):
     Defines a CORS time series from a file for analysis.
 
     Assumes the time series file has columns name, epoch, x, y, z and is
-    whitespace delimited.
+    a comma delimited CSV file, or if delim_whitespace is true then a whitespace delimited file.
 
     The xyz0 parameter can define a reference point used for calculating e, n, u
     components.  The default is to use the first coordinate.
@@ -1045,15 +1192,16 @@ class FileTimeseries(Timeseries):
 
     _columns = ("name", "epoch", "x", "y", "z")
     _epoch_col = "epoch"
+    _filename: str
 
     @staticmethod
     def seriesList(
-        filepattern,
-        solutiontype="default",
-        after=None,
-        before=None,
-        normalize=False,
-        delim_whitespace=False,
+        filepattern: str,
+        solutiontype: str = "default",
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+        delim_whitespace: bool = False,
     ):
         """
         Get the potential time series files, any file matching the filepattern.  The
@@ -1095,16 +1243,18 @@ class FileTimeseries(Timeseries):
 
     def __init__(
         self,
-        filename,
-        code=None,
-        solutiontype="default",
-        xyz0=None,
-        transform=None,
-        after=None,
-        before=None,
-        normalize=False,
-        delim_whitespace=False,
+        filename: str,
+        code: str | None = None,
+        solutiontype: str = "default",
+        xyz0: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+        delim_whitespace: bool = False,
     ):
+        if code is None:
+            code = ""
         Timeseries.__init__(
             self,
             code,
@@ -1118,11 +1268,11 @@ class FileTimeseries(Timeseries):
         self._filename = filename
         self._delim_whitespace = delim_whitespace
 
-    def _loadData(self):
+    def _loadData(self) -> None:
 
         filename = self._filename
         code = self._code
-
+        logging.debug(f"FileTimeseries: Loading data from {filename} for {code}")
         if not os.path.exists(filename):
             raise RuntimeError(
                 "CORS time series file {0} does not exist".format(filename)
@@ -1160,8 +1310,11 @@ class FileTimeseries(Timeseries):
         data = data[data.code == code]
         return data
 
-    def filename(self):
+    def filename(self) -> str:
         return self._filename
+
+
+TimeseriesCalcFunc = Callable[[dt.datetime], list[float] | np.ndarray]
 
 
 class FunctionTimeseries(Timeseries):
@@ -1171,18 +1324,21 @@ class FunctionTimeseries(Timeseries):
     as an input and return an XYZ coordinate.
     """
 
+    # This defines _function as a method.  How to define a callable non-method function?
+    # _function: TimeseriesCalcFunc
+
     def __init__(
         self,
-        function,
-        code="Function",
-        solutiontype="function",
-        xyz0=None,
-        transform=None,
-        after=None,
-        before=None,
-        increment=1,
-        index=None,
-        fillDays=False,
+        function: TimeseriesCalcFunc,
+        code: str = "Function",
+        solutiontype: str = "function",
+        xyz0: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        increment: int | float = 1,
+        index: pd.Index | None = None,
+        fillDays: bool = False,
     ):
         """
         Calculates a time series either each day from after to before, or for the days specified by index.
@@ -1204,12 +1360,12 @@ class FunctionTimeseries(Timeseries):
 
     def setDates(
         self,
-        after=None,
-        before=None,
-        increment=1,
-        index=None,
-        fillDays=False,
-        dates=None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        increment: int | float = 1,
+        index: pd.Index | None = None,
+        fillDays: bool = False,
+        dates: list[dt.datetime] | None = None,
     ):
         """
         Set the dates at which the function timeseries will be calculated.
@@ -1240,7 +1396,7 @@ class FunctionTimeseries(Timeseries):
         self._index = index
         self._loaded = False
 
-    def _loadData(self):
+    def _loadData(self) -> None:
         index = self._index
         function = self._function
         xyzdata = [function(d) for d in index.to_pydatetime()]
@@ -1249,6 +1405,20 @@ class FunctionTimeseries(Timeseries):
 
 
 class TimeseriesList(object):
+    """
+    Defines a source of coordinate time series for different codes.  Once the series is created then
+    time series for specific codes can be retrieved from it.  Using a string source to defined the input.
+    The source can be one of:
+
+        sqlite:filename
+        pg:connection_str
+        file: filepath
+        api:url
+
+    (A file: source filepath must include "{code}" that is the part of the filename that is the mark code)
+
+    """
+
     def __init__(
         self,
         source=None,
@@ -1259,12 +1429,22 @@ class TimeseriesList(object):
         series=None,
     ):
         self._get = None
+        eparams = {}
+        if after is not None:
+            eparams["after"] = after
+        if before is not None:
+            eparams["before"] = before
         if source is not None and series is None:
             series = []
-            if "{code}" in source:
+            if source.startswith("file:"):
+                filesource = source[5:]
+                if "{code}" not in filesource:
+                    raise RuntimeError(
+                        f'TimeseriesList: Specification of file time series {source} must include "{{code}}"'
+                    )
                 series.extend(
                     FileTimeseries.seriesList(
-                        source,
+                        filesource,
                         solutiontype,
                         after=after,
                         before=before,
@@ -1275,9 +1455,10 @@ class TimeseriesList(object):
                     filename=source.replace("{code}", code),
                     code=code,
                     normalize=normalize,
+                    **eparams,
                     **params,
                 )
-            elif source.startswith("pg:"):
+            if source.startswith("pg:"):
                 series.extend(
                     PgTimeseries.seriesList(
                         source[3:],
@@ -1288,25 +1469,25 @@ class TimeseriesList(object):
                     )
                 )
                 self._get = lambda code, **params: PgTimeseries(
-                    source=source, code=code, normalize=normalize, **params
+                    source=source, code=code, normalize=normalize, **eparams, **params
                 )
             elif source.startswith("api:"):
                 series.extend(
                     CoordApiTimeseries.seriesList(
-                        source[4:],
                         solutiontype,
                         after=after,
                         before=before,
                         normalize=normalize,
+                        apiurl=source[4:],
                     )
                 )
                 self._get = lambda code, **params: CoordApiTimeseries(
-                    source=source, code=code, normalize=normalize, **params
+                    source=source, code=code, normalize=normalize, **eparams, **params
                 )
-            else:
+            elif source.startswith("sqlite:"):
                 series.extend(
                     SqliteTimeseries.seriesList(
-                        source,
+                        source[7:],
                         solutiontype,
                         after=after,
                         before=before,
@@ -1314,7 +1495,7 @@ class TimeseriesList(object):
                     )
                 )
                 self._get = lambda code, **params: SqliteTimeseries(
-                    dbfile=source, code=code, normalize=normalize, **params
+                    dbfile=source, code=code, normalize=normalize, **eparams, **params
                 )
         self._series = series
 
@@ -1361,7 +1542,7 @@ class TimeseriesList(object):
             raise RuntimeError(
                 "Invalid code/solution type requested - no matching time series found"
             )
-        if self._get is not None:
+        if self._get is not None and len(solutiontype) > 1:
             return self._get(
                 code, solutiontype=series_types, after=after, before=before
             )
@@ -1381,7 +1562,20 @@ class TimeseriesList(object):
         Class representing a comparison between two time series lists.
         """
 
-        def __init__(self, ts1, ts2, after=None, before=None, normalize=False):
+        ts1: TimeseriesList
+        ts2: TimeseriesList
+        before: dt.datetime | None
+        after: dt.datetime | None
+        normalize: bool
+
+        def __init__(
+            self,
+            ts1: TimeseriesList,
+            ts2: TimeseriesList,
+            after: dt.datetime | None = None,
+            before: dt.datetime | None = None,
+            normalize: bool = False,
+        ):
             self.ts1 = ts1
             self.ts2 = ts2
             codes1 = self.ts1.codes()
@@ -1394,16 +1588,16 @@ class TimeseriesList(object):
 
         def get(
             self,
-            code,
-            after=None,
-            before=None,
-            plot=False,
-            plotDiff=False,
-            stats=False,
-            detrend=True,
-        ):
+            code: str,
+            after: dt.datetime | None = None,
+            before: dt.datetime | None = None,
+            plot: bool = False,
+            plotDiff: bool = False,
+            stats: bool = False,
+            detrend: bool = True,
+        ) -> Timeseries.Comparison:
             """
-            Returns the difference between two time series.  Returns a Timeseries.Comparison object
+            Returns the difference between two time series for a code.  Returns a Timeseries.Comparison object
             """
 
             after = after or self.after
@@ -1419,7 +1613,7 @@ class TimeseriesList(object):
                 print(comparison.stats())
             return comparison
 
-        def stats(self):
+        def stats(self) -> pd.DataFrame:
             """
             Get summary statistics for common stations between the two time series.
             Returns a DataFrame indexed on code, with columns rse_sol1_[enu],
@@ -1480,17 +1674,24 @@ class TimeseriesList(object):
 
 class SqliteTimeseriesList(TimeseriesList):
     def __init__(
-        self, source=None, solutiontype=None, after=None, before=None, normalize=False
+        self,
+        dbfile: str,
+        solutiontype: str = "default",
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
     ):
-        if not os.path.isfile(source):
+        if dbfile.startswith("sqlite:"):
+            dbfile = dbfile[7:]
+        if not os.path.isfile(dbfile):
             raise RuntimeError(
-                "SqliteTimeseriesList source is not a file: " + str(source)
+                "SqliteTimeseriesList source is not a file: " + str(dbfile)
             )
-        self._dbfile = source
+        self._dbfile = dbfile
         self._solutiontype = solutiontype
         TimeseriesList.__init__(
             self,
-            source=source,
+            source=f"sqlite:{dbfile}",
             solutiontype=solutiontype,
             after=after,
             before=before,
@@ -1506,10 +1707,16 @@ class SqliteTimeseriesList(TimeseriesList):
         db.close()
         return [types.solution_type[i] for i in types.index]
 
-    def stationCoordinates(self, date, solutiontype=None, codes=None, selectday=False):
+    def stationCoordinates(
+        self,
+        date: dt.datetime,
+        solutiontype: str | None = None,
+        codes: list[str] | None = None,
+        selectday: bool = False,
+    ):
         """
         Return a DataFrame of stations and coordinates that apply at a specific
-        epoch, or during a (UTC) day.
+        epoch (selectdate=False), or during (selectday=True) a (UTC) day.
         """
 
         sql = """

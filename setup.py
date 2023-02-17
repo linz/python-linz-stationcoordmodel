@@ -21,7 +21,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version="1..0",
+    version="1.1.1",
     description="LINZ.station_coord_model module - model time series of station coordinates",
     long_description=long_description,
     # The project's main homepage.
@@ -60,7 +60,7 @@ setup(
     # Note: matplotlib dependency not included as causes probrams not to run,
     # forces dependency on tornado (python web server)
     # install_requires=['linz-geodetic','numpy','scipy','matplotlib','pandas'],
-    install_requires=["linz-geodetic", "numpy", "scipy", "pandas"],
+    install_requires=["linz-geodetic", "numpy", "scipy", "pandas", "requests"],
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
     # for example:
