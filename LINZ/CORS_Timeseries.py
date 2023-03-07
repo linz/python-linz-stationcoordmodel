@@ -42,6 +42,7 @@ def robustStandardError(obs: np.ndarray, percentile: float = 95.0) -> np.ndarray
 def findOutliers(
     enu_data: pd.DataFrame,
     ndays: int = 10,
+    mindays: int = 4,
     tolerance: int | float = 5.0,
     percentile: int | float = 95.0,
     goodrows: bool = False,
@@ -52,29 +53,24 @@ def findOutliers(
     is a dataframe with columns e, n, u and a datetime index.
 
     Based on the difference between the observated value and a local median of
-    values within ndays of the value being tested.  Outliers are points with an
+    values within ndays of the value being tested, so long as there are at least
+    mindays days.  Outliers are points with an
     E,N, or U value more than tolerance times the robust standard error from the
     median.  The robust standard error is calculated with a specific percentage.
 
     Note: calculating the medians is slow!
     """
-    testrange = pd.DateOffset(days=ndays)
-    idx = enu_data.index
-    obs = np.vstack((enu_data.e, enu_data.n, enu_data.u)).T
-    rse = robustStandardError(obs, percentile)
-    medians = np.array(
-        [
-            np.median(
-                obs[np.logical_and(idx >= d - testrange, idx <= d + testrange)], axis=0
-            )
-            for d in idx
-        ]
-    )
+    obsxyz = enu_data.to_numpy()
+    rse = robustStandardError(obsxyz, percentile)
+    medians = data = enu_data.rolling(
+        f"{ndays}d", min_periods=mindays, center=True
+    ).median()
+    goodobs = ((enu_data - medians).abs() < rse * tolerance).all(axis=1)
     if goodrows:
-        rows = np.where(np.all(np.abs(obs - medians) <= rse * tolerance, axis=1))
+        rows = enu_data.index[goodobs]
     else:
-        rows = np.where(np.any(np.abs(obs - medians) > rse * tolerance, axis=1))
-    return idx[rows]
+        rows = enu_data.index[~goodobs]
+    return rows
 
 
 def normalizeSolutionType(solutiontype: str | list[str]) -> str:
@@ -581,16 +577,19 @@ class Timeseries(object):
     def findOutliers(
         self,
         ndays: int = 10,
+        mindays: int = 4,
         tolerance: float | int = 5.0,
         percentile: float | int = 95.0,
         goodrows: bool = False,
     ) -> pd.Index:
         """
-        Return index of outliers or good rows.
+        Return index of outliers or good rows.  For more info on parameters see
+        CORS_Timeseries.findOutliers.
         """
         return findOutliers(
             self.getData(),
             ndays=ndays,
+            mindays=mindays,
             tolerance=tolerance,
             percentile=percentile,
             goodrows=goodrows,
@@ -599,6 +598,7 @@ class Timeseries(object):
     def withoutOutliers(
         self,
         ndays: int = 10,
+        mindays: int = 4,
         tolerance: float | int = 5.0,
         percentile: float | int = 95.0,
     ) -> Timeseries:
@@ -606,7 +606,11 @@ class Timeseries(object):
         Return a new version of the time series without the outliers
         """
         index = self.findOutliers(
-            ndays=ndays, tolerance=tolerance, percentile=percentile, goodrows=True
+            ndays=ndays,
+            mindays=mindays,
+            tolerance=tolerance,
+            percentile=percentile,
+            goodrows=True,
         )
         return self.filtered(index=index)
 
