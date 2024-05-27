@@ -78,7 +78,7 @@ def asday(date):
     """
     Utility function to convert a time to a day number, referenced to refdate (2000-01-01)
 
-    Input date can be 
+    Input date can be
     * a floating point number, treated as a day number
     * a string formatted as d-mm-yyyy hh:mm or yyyy-mm-ddThh:mm:ss
     * a python date or datetime class
@@ -111,8 +111,8 @@ def fromday(days):
 
 def days_array(dates):
     """
-    Convert an array of dates to a numpy array of floating point day numbers. 
-    
+    Convert an array of dates to a numpy array of floating point day numbers.
+
     Uses the asday function to convert the dates if necessary.
     """
     if not isinstance(dates, np.ndarray):
@@ -131,7 +131,7 @@ class parameter(object):
     """
     Base class for a parameter of a model function.
 
-    Also useable for simple floating point parameters.  Note that the actual parameter values and 
+    Also useable for simple floating point parameters.  Note that the actual parameter values and
     most attributes are actaully held by the model - the parameter object just holds an index into the
     model (why did I do this?)
     """
@@ -140,8 +140,8 @@ class parameter(object):
         """
         Create a parameter definition
 
-        Parameters hold two version of a value, one used in fitting (fitValue), and one 
-        value presented to the user and stored in the XML file (value).  These may differ 
+        Parameters hold two version of a value, one used in fitting (fitValue), and one
+        value presented to the user and stored in the XML file (value).  These may differ
         by a scale factor (only the fitValue is actually stored).
 
         Arguments:
@@ -211,7 +211,7 @@ class parameter(object):
 
     def getError(self):
         """
-        Return the error (scaled to match the "user" value. 
+        Return the error (scaled to match the "user" value.
 
         The error is from the last fit in which the parameter was calculated
         """
@@ -391,17 +391,17 @@ class base_function(object):
     """
     Abstract base class for the functions (components) used to build a coordinate prediction model
 
-    Each derived class implements a function calc for calculating the component at a given time, 
+    Each derived class implements a function calc for calculating the component at a given time,
     and defines the parameters used by the component.
 
     The component is initiallized with with the model to which it will belong, a
-    reference date, and the number of parameters it is defined by.  The reference date is a 
+    reference date, and the number of parameters it is defined by.  The reference date is a
     parameter, which applies for most models (but not the offset, velocity, and cyclic components.
-    It is used as a reference date for sorting the components, and more most models is a 
+    It is used as a reference date for sorting the components, and more most models is a
     fittable parameter of the model.  It is implemented as the last parameter of the model.
 
     It may be enabled or disabled - if it is disabled then it is not used in any calculations
-    or fitting.  It may also be fitted or not fitted - if it is not fitted then it will not 
+    or fitting.  It may also be fitted or not fitted - if it is not fitted then it will not
     generally be used in fitting the model.
 
     Each component parameter may also be fitted or not fitted.
@@ -585,7 +585,7 @@ class base_function(object):
 
 class offset(base_function):
     """
-    A simple constant offset componet of the model (simplistically represents 
+    A simple constant offset componet of the model (simplistically represents
     the mean offset from the model reference coordinate)
     """
 
@@ -609,7 +609,7 @@ class offset(base_function):
 
 class velocity(base_function):
     """
-    A simple constant velocity componet of the model (simplistically represents 
+    A simple constant velocity componet of the model (simplistically represents
     the mean velocity of the mark)
     """
 
@@ -687,7 +687,7 @@ class cyclic(base_function):
 
     def setComponent(self, i, issine, value, fixed=False):
         """
-        Overwrite the setComponent function to allow setting the sine or cosine using 
+        Overwrite the setComponent function to allow setting the sine or cosine using
         an index for the ordinate (E,N,U) and a boolean for sine (true) or cosine (false)
         component.
         """
@@ -882,7 +882,7 @@ class exponential_decay(base_function):
 
     def calc(self, date):
         y = self._dateOffset(date) / self._param[3]
-        y = 1.0 - np.exp(np.minimum(0.0,-y))
+        y = 1.0 - np.exp(np.minimum(0.0, -y))
         return y.dot([self._param[:3]])
 
     def setDuration(self, decay, fixed=True):
@@ -930,27 +930,27 @@ class exclude_obs(object):
 
 class Model(object):
     """
-    Class representing a station prediction model.  
+    Class representing a station prediction model.
 
     The class contains a coordinate prediction model defining the predicted offset
-    of the mark from its reference coordinate at any given date.  The model has a number of 
+    of the mark from its reference coordinate at any given date.  The model has a number of
     components, as a minimum it always has an offset, velocity, annual, and semiannual term.
     Additional components can be added and removed with the addComponent and removeComponent
     functions.
 
-    The model can be evaluated at a set of dates using the calc function, returning either 
+    The model can be evaluated at a set of dates using the calc function, returning either
     XYZ coordinates, or ENU offsets from the reference point.
 
-    Observations can be loaded into the model from a time series file using the 
-    loadTimeSeries function. The model components can then be fitted to the time series using 
-    the fit and fitAllLinear functions.  The loaded time series can be extracted with the 
+    Observations can be loaded into the model from a time series file using the
+    loadTimeSeries function. The model components can then be fitted to the time series using
+    the fit and fitAllLinear functions.  The loaded time series can be extracted with the
     getObs function.
 
     The class can also hold a list of dates for which the time series data are rejected from
     fitting calculations, and a set of outages - periods for which the time series contains
     no data.
 
-    The class can be persisted to an XML file.  The time series data is not persisted - that 
+    The class can be persisted to an XML file.  The time series data is not persisted - that
     must be reloaded each time the model is instantiated if it is required.
     """
 
@@ -975,7 +975,7 @@ class Model(object):
 
     def setStation(self, station, xyz, site="", priority=1):
         """
-        Reset the station code for the model. 
+        Reset the station code for the model.
 
         Args:
             station    The station code
@@ -996,10 +996,10 @@ class Model(object):
 
     def copy(self, filename=None):
         """
-        Return a copy of the current model.  
-        
+        Return a copy of the current model.
+
         Optionally sets a filename that will be used for saving the model.
-        The copy includes the model components and the excluded observations, 
+        The copy includes the model components and the excluded observations,
         but not other information (eg loaded time series, outages).
 
         Args:
@@ -1095,7 +1095,7 @@ class Model(object):
         updateAvailability=False,
         updateCheckFunc=None,
         keepVersionDate=False,
-        saveTimeseriesDates=False
+        saveTimeseriesDates=False,
     ):
         """
         Save the model.
@@ -1107,7 +1107,7 @@ class Model(object):
                                   information.
             updateCheckFunc       Optional function used to confirm whether data is actually
                                   available even if there is not a time series entry for a day.
-                                  If set to true, then the outages will be cleared from the 
+                                  If set to true, then the outages will be cleared from the
                                   model.
             keepVersionDate       Set to true to leave the version date unchanged
             saveTimeseriesDates   Set the start/end date from the timeseries dates.
@@ -1122,7 +1122,7 @@ class Model(object):
             self.versiondate = datetime.now()
         if saveTimeseriesDates:
             self.startdate = self.dates[0]
-            self.enddate = self.dates[-1]            
+            self.enddate = self.dates[-1]
         root = self.toXmlElement()
         if os.path.exists(filename):
             oldroot = self.readStationXmlFile(filename)
@@ -1253,7 +1253,7 @@ class Model(object):
 
     def addBasicComponents(self):
         """
-        Adds the basic components all models use (ie offset, velocity, annual, and 
+        Adds the basic components all models use (ie offset, velocity, annual, and
         semi-annual components)
         """
         ctypes = [type(c) for c in self.components]
@@ -1288,11 +1288,11 @@ class Model(object):
 
     def calc(self, dates, enu=True, excludeTypes=None):
         """
-        Calculate the model at one or more dates. 
+        Calculate the model at one or more dates.
 
         Args:
             dates   Either a single date or a list of dates
-            enu     If true then returns the E,N,U components relative to the 
+            enu     If true then returns the E,N,U components relative to the
                     reference coordinate.  Otherwise returns geocentric
                     X,Y,Z values
 
@@ -1330,7 +1330,7 @@ class Model(object):
             comment A comment describing why the observation is not used
             use     True or false to use or not use the observation
             toggle  If true then the current value is toggled
-    
+
         """
         if toggle:
             use = not self.useobs[index]
@@ -1384,7 +1384,7 @@ class Model(object):
         """
         Loads a time series to be analysed with the model
 
-        Assumes the time series file has columns name, epoch, x, y, z and is 
+        Assumes the time series file has columns name, epoch, x, y, z and is
         whitespace delimited.  The filename can include {code}, which will be replaced
         with the station code associated with the model.
 
@@ -1396,7 +1396,7 @@ class Model(object):
                 filename = filename.replace("{code}", self.station)
             timeseries = FileTimeseries(filename, code=self.station)
 
-        timeseries.setXyzTransform(self.xyz)
+        timeseries.setXyzTransform(self.xyz, transform=transform)
         self.timeseries = timeseries
         self.dates, self.enu = timeseries.getObs()
         self.station = timeseries.code()
@@ -1467,7 +1467,7 @@ class Model(object):
         Optionally can fit all parameters of selected models even if non-linear.
 
         Args:
-            fitFixed       fits matching parameters that are fixed as well as 
+            fitFixed       fits matching parameters that are fixed as well as
                            those that are not.
             fitNonLinear   an optional list of models for which non
                            linear parameters are also fitted
@@ -1492,7 +1492,7 @@ class Model(object):
 
     def fitParams(self, fit_params, dateRange=None):
         """
-        Fit a selected set of parameters.  
+        Fit a selected set of parameters.
 
         Args:
             fit_params   An array of parameters (of model functions)
@@ -1596,7 +1596,7 @@ class Model(object):
                             it is called with parameters (code,date), where date is a datetime.date
                             object, and should return True or False to confirm whether the data
                             is available or not.
-                            
+
 
         The outages are potentially used to determine when data from the station
         might (or might not) be available.  These are stored in the model XML file.
@@ -1823,7 +1823,11 @@ def main():
         "-x", "--calc-xyz", action="store_true", help="Calculate XYZ instead of enu"
     )
     parser.add_argument(
-        "-i", "--increment_days", type=int, default=1, help="Increment in days for calculation"
+        "-i",
+        "--increment_days",
+        type=int,
+        default=1,
+        help="Increment in days for calculation",
     )
     parser.add_argument(
         "-d", "--debug-calcs", action="store_true", help="Print individual components"
