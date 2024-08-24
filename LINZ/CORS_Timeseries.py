@@ -1174,7 +1174,6 @@ class CoordApiTimeseries(Timeseries):
 
 
 class FileTimeseries(Timeseries):
-
     """
     Defines a CORS time series from a file for analysis.
 
@@ -1322,7 +1321,6 @@ TimeseriesCalcFunc = Callable[[dt.datetime], list[float] | np.ndarray]
 
 
 class FunctionTimeseries(Timeseries):
-
     """
     Creates a CORS timeseries based on a function. The function must take a date
     as an input and return an XYZ coordinate.
@@ -1396,7 +1394,7 @@ class FunctionTimeseries(Timeseries):
             else:
                 dtto = dt.date(before.year, before.month, before.day)
             incdef = str(int(increment)) + "D"
-            index = pd.DatetimeIndex(start=dtfrom, end=dtto, freq=incdef)
+            index = pd.date_range([dtfrom, dtto], freq=incdef)
         self._index = index
         self._loaded = False
 
