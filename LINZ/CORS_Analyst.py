@@ -357,7 +357,7 @@ class CORS_Analyst(object):
             # Generate data for plotting gdb coord and stn pred model
             # Get the observed timeseries
             ts = stndata.timeseries
-            tsdata = ts.getData(solution_types=True)
+            tsdata = ts.getData()
 
             # Fill the model
             if fillmodel:
