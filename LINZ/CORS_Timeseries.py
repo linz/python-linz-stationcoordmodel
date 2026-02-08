@@ -5,7 +5,6 @@ import os
 import os.path
 import re
 import sqlite3
-import json
 import logging
 
 import numpy as np
@@ -15,7 +14,7 @@ from scipy import stats
 
 from LINZ.Geodetic.Ellipsoid import GRS80
 
-from typing import Any, Callable, NewType
+from typing import Any, Callable
 
 
 def robustStandardError(obs: np.ndarray, percentile: float = 95.0) -> np.ndarray:
@@ -62,9 +61,7 @@ def findOutliers(
     """
     obsxyz = enu_data.to_numpy()
     rse = robustStandardError(obsxyz, percentile)
-    medians = data = enu_data.rolling(
-        f"{ndays}d", min_periods=mindays, center=True
-    ).median()
+    medians = enu_data.rolling(f"{ndays}d", min_periods=mindays, center=True).median()
     goodobs = ((enu_data - medians).abs() < rse * tolerance).all(axis=1)
     if goodrows:
         rows = enu_data.index[goodobs]
@@ -195,7 +192,6 @@ class Timeseries(object):
         lon, lat = GRS80.geodetic(xyzenu)[:2]
         enu_axes = GRS80.enu_axes(lon, lat)
 
-        diff = xyz - xyz0
         enu = (xyz - xyz0).dot(enu_axes.T)
         data["e"] = enu[:, 0]
         data["n"] = enu[:, 1]
@@ -552,7 +548,7 @@ class Timeseries(object):
         """
 
         loffset = None
-        if type(rule) == int:
+        if type(rule) is int:
             ndays = rule
             rule = pd.tseries.offsets.Day(ndays)
             loffset = pd.tseries.offsets.Day(int(ndays / 2))
@@ -731,7 +727,7 @@ class SqliteTimeseries(Timeseries):
     _dbfile: str
 
     _sql = """
-        select epoch, code as code, X as x, Y as y, Z as z 
+        select epoch, code as code, X as x, Y as y, Z as z
         from mark_coordinate m
         where code=? and solution_type=?
         {when}
@@ -740,20 +736,20 @@ class SqliteTimeseries(Timeseries):
 
     _sqlMultiType = """
         select
-             m.epoch, m.code as code, m.solution_type, m.X as x, m.Y as y, m.Z as z 
+             m.epoch, m.code as code, m.solution_type, m.X as x, m.Y as y, m.Z as z
         from
              mark_coordinate m,
              (select
                  epoch,
                  min({case}) as version
-              from 
+              from
                  mark_coordinate
               where code=? and
                     {case} < ?
               group by
                  epoch
               ) as v
-        where 
+        where
             m.code = ? and
             m.epoch=v.epoch and
             {case} = v.version
@@ -874,9 +870,9 @@ class SqliteTimeseries(Timeseries):
         return data
 
 
-class PgTimeseries(Timeseries):
+class SqlTimeseries(Timeseries):
     """
-    Postgres time series.  Assumes data are held in a table coords with columns
+    SqlAlchemy time series.  Assumes data are held in a table coords with columns
     solution_id (identifies calc date SINEX file from which solutions loaded)
     solution_type (string defining solution type)
     code (mark id)
@@ -887,100 +883,21 @@ class PgTimeseries(Timeseries):
     """
 
     GetCoordinatesSql = """
-        with p as (
-            select 
-               %s as solution_type,
-               %s as code,
-               %s::timestamp without time zone as min_epoch,
-               %s::timestamp without time zone as max_epoch
-        )
-        select DISTINCT ON (date(epoch))
-           to_char(epoch,'YYYY-MM-DD') as epoch, 
-           X as x, Y as y, Z as z 
-        from coords c, p
-        where 
-           c.code=p.code and 
-           c.solution_type=p.solution_type and
-           (p.min_epoch IS NULL OR epoch >= p.min_epoch) and
-           (p.max_epoch IS NULL OR epoch <= p.max_epoch)
-        order by date(epoch),solution_id DESC
-        """
-
-    GetMultiSolutionCoordinatesSql = """
-            with p as (
-            select 
-               %s as solution_type,
-               %s as code,
-               %s::timestamp without time zone as min_epoch,
-               %s::timestamp without time zone as max_epoch
-        ),
-        stypes as (
-            select
-                s as solution_type,
-                array_position(string_to_array((select solution_type from p),'+'),s) as priority
-            from
-                unnest(string_to_array((select solution_type from p),'+')) s
-        ),
-        solns as (
-            select 
-                epoch, 
-                c.solution_type, 
-                solution_id,
-                X as x, Y as y, Z as z, 
-                stypes.priority
-            from p, coords c join stypes on c.solution_type=stypes.solution_type
-            where 
-            c.code=p.code and 
-           (p.min_epoch IS NULL OR epoch >= p.min_epoch) and
-           (p.max_epoch IS NULL OR epoch <= p.max_epoch)
-        )
         select 
-            distinct on (date(epoch))
-            to_char(epoch,'YYYY-MM-DD') as epoch,
-            solution_type,
-            x, y, z
-        from
-            solns
-        where 
-            priority is not NULL
-        order by
-            date(epoch),priority,solution_id DESC
+        to_char(to_date(sessionid,'YYYY:DDD'),'YYYY-MM-DD') as epoch,
+        strategy as solution_type,
+        x,y,z
+        from 
+        get_coordinates(%s,%s, 
+        to_char(to_date(%s,'YYYY-MM-DD'),'YYYY:DDD'), 
+        to_char(to_date(%s,'YYYY-MM-DD'),'YYYY:DDD'))
         """
 
-    GetCodeSolutionTypeSql = """
-        select distinct code, solution_type
-        from coords
-        order by code, solution_type
-        """
+    GetMultiSolutionCoordinatesSql = GetCoordinatesSql
 
-    @staticmethod
-    def _openDb(source: str | None) -> pd._SqlConnection:
-        import psycopg2
-
-        source = source or ""
-        srcprm: dict = {}
-        if source.startswith("pg:"):
-            source = source[3:]
-        if source == "":
-            dbname = os.environ.get("PGDATABASE")
-            if dbname is None:
-                raise RuntimeError(
-                    "Postgres database not defined by environment variables"
-                )
-            source = "dbname=" + dbname
-        try:
-            if source.startswith("{"):
-                srcprm = json.loads(source)
-            else:
-                if "=" not in source:
-                    source = "dbname=" + source
-                srcprm = {"dsn": source}
-            db = psycopg2.connect(**srcprm)
-        except:
-            if "password" in srcprm:
-                srcprm["password"] = "..."
-            raise RuntimeError(f"Cannot connect to database {srcprm}")
-        return db
+    GetCodeSolutionTypeSql = (
+        "select code, strategy as solution_type from get_solution_stats()"
+    )
 
     @staticmethod
     def seriesList(
@@ -989,10 +906,10 @@ class PgTimeseries(Timeseries):
         after: dt.datetime | None = None,
         before: dt.datetime | None = None,
         normalize: bool = False,
-    ) -> list[PgTimeseries]:
-        db = PgTimeseries._openDb(source)
-        seriescodes = pd.read_sql(PgTimeseries.GetCodeSolutionTypeSql, db)
-        db.close()
+        sql: str | None = None,
+    ) -> list[SqlTimeseries]:
+        sql = sql or SqlTimeseries.GetCodeSolutionTypeSql
+        seriescodes = pd.read_sql(sql, source)
         series = []
         found = []
         stypes = solutiontype.split("+") if solutiontype else None
@@ -1003,7 +920,7 @@ class PgTimeseries(Timeseries):
                 if (code, solntype) in found:
                     continue
                 series.append(
-                    PgTimeseries(
+                    SqlTimeseries(
                         source,
                         code,
                         solntype,
@@ -1025,6 +942,8 @@ class PgTimeseries(Timeseries):
         after: dt.datetime | None = None,
         before: dt.datetime | None = None,
         normalize: bool = False,
+        getcoordsql: str | None = None,
+        getmulticoordsql: str | None = None,
     ):
         Timeseries.__init__(
             self,
@@ -1037,6 +956,10 @@ class PgTimeseries(Timeseries):
             normalize=normalize,
         )
         self._source = source
+        self._getcoordsql = getcoordsql or SqlTimeseries.GetCoordinatesSql
+        self._getmulticoordsql = (
+            getmulticoordsql or SqlTimeseries.GetMultiSolutionCoordinatesSql
+        )
 
     def _loadData(self) -> None:
         solntype = self.solutiontype()
@@ -1044,11 +967,10 @@ class PgTimeseries(Timeseries):
         logging.debug(
             f"CORS_Timeseries: Loading Postgres data from {self._source} for {code}:{solntype}"
         )
-        db = self._openDb(self._source)
         if "+" not in solntype:
-            sql = PgTimeseries.GetCoordinatesSql
+            sql = self._getcoordsql
         else:
-            sql = PgTimeseries.GetMultiSolutionCoordinatesSql
+            sql = self._getmulticoordsql
 
         minepoch = None
         maxepoch = None
@@ -1056,11 +978,125 @@ class PgTimeseries(Timeseries):
             maxepoch = self._before.strftime("%Y-%m-%d")
         if self._after is not None:
             minepoch = self._after.strftime("%Y-%m-%d")
-        params = [solntype, code, minepoch, maxepoch]
-        data = pd.read_sql(sql, db, params=params, index_col="epoch")
-        db.close()
+        # Note: sqlalchemy only accepts parameters as tuple or dictionary, not list
+        params = (solntype, code, minepoch, maxepoch)
+        data = pd.read_sql(sql, self._source, params=params, index_col="epoch")
         data.set_index(pd.to_datetime(data.index), inplace=True)
         return data
+
+
+class PgTimeseries(SqlTimeseries):
+    """
+    Postgres time series.  Assumes data are held in a table coords with columns
+    solution_id (identifies calc date SINEX file from which solutions loaded)
+    solution_type (string defining solution type)
+    code (mark id)
+    epoch (date/time of calculated coordinate)
+    x,y,z (ordinates)
+
+    Assumes connection details are defined in environment variables.
+    """
+
+    GetCoordinatesSql = SqlTimeseries.GetCoordinatesSql
+    GetMultiSolutionCoordinatesSql = SqlTimeseries.GetMultiSolutionCoordinatesSql
+    GetCodeSolutionTypeSql = SqlTimeseries.GetCodeSolutionTypeSql
+
+    @staticmethod
+    def _dburl(source: str | None) -> str:
+        # Create an SQLAlchemy  psycopg2+postgresql URL from the source string or environment variables
+        if source is None:
+            source = ""
+
+        # Parse environment variables or build URL from components
+        if source.startswith("postgresql+psycopg2://"):
+            return source
+
+        # Remove pg: prefix if present
+        if source.startswith("pg:"):
+            source = source[3:]
+
+        # Get connection details from environment variables with defaults
+        host = os.environ.get("PGHOST", "localhost")
+        port = os.environ.get("PGPORT", "5432")
+        database = os.environ.get("PGDATABASE")
+        user = os.environ.get("PGUSER")
+        password = os.environ.get("PGPASSWORD")
+
+        # Handle connection string format
+        if "=" in source:
+            # Parse key=value format
+            params = {}
+            for part in source.split():
+                if "=" in part:
+                    key, value = part.split("=", 1)
+                    params[key] = value
+
+            host = params.get("host", host)
+            port = params.get("port", port)
+            database = params.get("dbname", params.get("database", database))
+            user = params.get("user", user)
+            password = params.get("password", password)
+        elif re.match(r"^\w+$", source):
+            # Assume it's just a database name
+            database = source
+        elif database is None or database == "":
+            raise RuntimeError(
+                f"Unrecognized source format for Postgres connection: {source}"
+            )
+
+        url = "postgresql+psycopg2://"
+        if user:
+            url += user
+            if password:
+                url += f":{password}"
+            url += "@"
+        url += f"{host}:{port}/{database}"
+        return url
+
+    @staticmethod
+    def seriesList(
+        source: str | None = None,
+        solutiontype: str | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+        sql: str | None = None,
+    ) -> list[SqlTimeseries]:
+        return SqlTimeseries.seriesList(
+            source=PgTimeseries._dburl(source),
+            solutiontype=solutiontype,
+            after=after,
+            before=before,
+            normalize=normalize,
+            sql=sql or PgTimeseries.GetCodeSolutionTypeSql,
+        )
+
+    def __init__(
+        self,
+        source: str | None,
+        code: str,
+        solutiontype: str = "default",
+        xyz0: np.ndarray | None = None,
+        transform: TransformFunc | None = None,
+        after: dt.datetime | None = None,
+        before: dt.datetime | None = None,
+        normalize: bool = False,
+    ):
+        url = PgTimeseries._dburl(source)
+
+        SqlTimeseries.__init__(
+            self,
+            url,
+            code,
+            solutiontype=solutiontype,
+            xyz0=xyz0,
+            transform=transform,
+            after=after,
+            before=before,
+            normalize=normalize,
+            getcoordsql=PgTimeseries.GetCoordinatesSql,
+            getmulticoordsql=PgTimeseries.GetMultiSolutionCoordinatesSql,
+        )
 
 
 class CoordApiTimeseries(Timeseries):
@@ -1499,6 +1535,23 @@ class TimeseriesList(object):
                 self._get = lambda code, **params: SqliteTimeseries(
                     dbfile=source, code=code, normalize=normalize, **eparams, **params
                 )
+            elif re.match(r"^[\w+]+://", source):
+                series.extend(
+                    SqlTimeseries.seriesList(
+                        source=source,
+                        solutiontype=solutiontype,
+                        after=after,
+                        before=before,
+                        normalize=normalize,
+                    )
+                )
+                self._get = lambda code, **params: SqlTimeseries(
+                    source=source, code=code, normalize=normalize, **eparams, **params
+                )
+            else:
+                raise RuntimeError(
+                    f"TimeseriesList: Unrecognized source type in {source}"
+                )
         self._series = series
 
     def codes(self):
@@ -1705,7 +1758,7 @@ class SqliteTimeseriesList(TimeseriesList):
             select distinct solution_type from mark_coordinate m
             """
         db = SqliteTimeseries._openDb(self._dbfile)
-        types = pd.read_sql(SqliteTimeseries._sqlTypes, db)
+        types = pd.read_sql(_sqlTypes, db)
         db.close()
         return [types.solution_type[i] for i in types.index]
 
@@ -1722,7 +1775,7 @@ class SqliteTimeseriesList(TimeseriesList):
         """
 
         sql = """
-            select code as code, solution_type as solutiontype, epoch, X as x, Y as y, Z as z 
+            select code as code, solution_type as solutiontype, epoch, X as x, Y as y, Z as z
             from mark_coordinate m
             where solution_type=?
             {when}

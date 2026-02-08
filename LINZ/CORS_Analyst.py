@@ -80,9 +80,9 @@ class CORS_Analyst(object):
         self.loadDeformationModel()
 
     def boolParser(self, value):
-        if value == None:
+        if value is None:
             return False
-        elif type(value) == bool:
+        elif type(value) is bool:
             return value
         elif str(value).lower() == "yes":
             return True
